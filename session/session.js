@@ -27,7 +27,7 @@ function Session(req, data) {
 
   if (typeof data === 'object' && data !== null) {
     // merge data into this, ignoring prototype properties
-    for (var prop in data) {
+    for (const prop in data) {
       if (!(prop in this)) {
         this[prop] = data[prop];
       }
@@ -86,8 +86,8 @@ defineMethod(Session.prototype, 'save', function save(fn) {
  */
 
 defineMethod(Session.prototype, 'reload', function reload(fn) {
-  var req = this.req;
-  var store = this.req.sessionStore;
+  const req = this.req;
+  const store = this.req.sessionStore;
 
   store.get(this.id, function (err, sess) {
     if (err) return fn(err);

@@ -1,10 +1,10 @@
 'use strict';
 
-var session = require('../../');
-var util = require('util');
+const session = require('../../');
+const util = require('util');
 
 /* istanbul ignore next */
-var defer =
+const defer =
   typeof setImmediate === 'function' ?
   setImmediate :
   function (fn) {
@@ -26,7 +26,7 @@ SmartStore.prototype.destroy = function destroy(sid, callback) {
 };
 
 SmartStore.prototype.get = function get(sid, callback) {
-  var sess = this.sessions[sid];
+  let sess = this.sessions[sid];
 
   if (!sess) {
     return;

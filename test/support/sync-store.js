@@ -1,7 +1,7 @@
 'use strict';
 
-var session = require('../../');
-var util = require('util');
+const session = require('../../');
+const util = require('util');
 
 module.exports = SyncStore;
 

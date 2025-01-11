@@ -13,8 +13,8 @@
  * @private
  */
 
-var Store = require('./store');
-var util = require('util');
+const Store = require('./store');
+const util = require('util');
 
 /**
  * Shim setImmediate for node.js < 0.10
@@ -22,7 +22,7 @@ var util = require('util');
  */
 
 /* istanbul ignore next */
-var defer =
+const defer =
   typeof setImmediate === 'function' ?
   setImmediate :
   function (fn) {
@@ -59,12 +59,12 @@ util.inherits(MemoryStore, Store);
  */
 
 MemoryStore.prototype.all = function all(callback) {
-  var sessionIds = Object.keys(this.sessions);
-  var sessions = Object.create(null);
+  const sessionIds = Object.keys(this.sessions);
+  const sessions = Object.create(null);
 
-  for (var i = 0; i < sessionIds.length; i++) {
-    var sessionId = sessionIds[i];
-    var session = getSession.call(this, sessionId);
+  for (let i = 0; i < sessionIds.length; i++) {
+    const sessionId = sessionIds[i];
+    const session = getSession.call(this, sessionId);
 
     if (session) {
       sessions[sessionId] = session;
@@ -148,7 +148,7 @@ MemoryStore.prototype.length = function length(callback) {
  */
 
 MemoryStore.prototype.touch = function touch(sessionId, session, callback) {
-  var currentSession = getSession.call(this, sessionId);
+  const currentSession = getSession.call(this, sessionId);
 
   if (currentSession) {
     // update expiration
@@ -165,7 +165,7 @@ MemoryStore.prototype.touch = function touch(sessionId, session, callback) {
  */
 
 function getSession(sessionId) {
-  var sess = this.sessions[sessionId];
+  let sess = this.sessions[sessionId];
 
   if (!sess) {
     return;
@@ -175,7 +175,7 @@ function getSession(sessionId) {
   sess = JSON.parse(sess);
 
   if (sess.cookie) {
-    var expires =
+    const expires =
       typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
 
     // destroy expired session

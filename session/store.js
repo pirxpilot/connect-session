@@ -12,10 +12,10 @@
  * @private
  */
 
-var Cookie = require('./cookie');
-var EventEmitter = require('events').EventEmitter;
-var Session = require('./session');
-var util = require('util');
+const Cookie = require('./cookie');
+const EventEmitter = require('events').EventEmitter;
+const Session = require('./session');
+const util = require('util');
 
 /**
  * Module exports.
@@ -48,7 +48,7 @@ util.inherits(Store, EventEmitter);
  */
 
 Store.prototype.regenerate = function (req, fn) {
-  var self = this;
+  const self = this;
   this.destroy(req.sessionID, function (err) {
     self.generate(req);
     fn(err);
@@ -65,11 +65,11 @@ Store.prototype.regenerate = function (req, fn) {
  */
 
 Store.prototype.load = function (sid, fn) {
-  var self = this;
+  const self = this;
   this.get(sid, function (err, sess) {
     if (err) return fn(err);
     if (!sess) return fn();
-    var req = { sessionID: sid, sessionStore: self };
+    const req = { sessionID: sid, sessionStore: self };
     fn(null, self.createSession(req, sess));
   });
 };
@@ -84,8 +84,8 @@ Store.prototype.load = function (sid, fn) {
  */
 
 Store.prototype.createSession = function (req, sess) {
-  var expires = sess.cookie.expires;
-  var originalMaxAge = sess.cookie.originalMaxAge;
+  const expires = sess.cookie.expires;
+  const originalMaxAge = sess.cookie.originalMaxAge;
 
   sess.cookie = new Cookie(sess.cookie);
 

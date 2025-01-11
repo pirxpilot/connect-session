@@ -1,6 +1,6 @@
-var { describe, it } = require('node:test');
-var assert = require('assert');
-var Cookie = require('../session/cookie');
+const { describe, it } = require('node:test');
+const assert = require('assert');
+const Cookie = require('../session/cookie');
 
 describe('new Cookie()', function () {
   it('should create a new cookie object', function () {
@@ -8,22 +8,22 @@ describe('new Cookie()', function () {
   });
 
   it('should default expires to null', function () {
-    var cookie = new Cookie();
+    const cookie = new Cookie();
     assert.strictEqual(cookie.expires, null);
   });
 
   it('should default httpOnly to true', function () {
-    var cookie = new Cookie();
+    const cookie = new Cookie();
     assert.strictEqual(cookie.httpOnly, true);
   });
 
   it('should default path to "/"', function () {
-    var cookie = new Cookie();
+    const cookie = new Cookie();
     assert.strictEqual(cookie.path, '/');
   });
 
   it('should default maxAge to null', function () {
-    var cookie = new Cookie();
+    const cookie = new Cookie();
     assert.strictEqual(cookie.maxAge, null);
   });
 
@@ -48,7 +48,7 @@ describe('new Cookie()', function () {
     });
 
     it('should ignore "data" option', function () {
-      var cookie = new Cookie({ data: { foo: 'bar' }, path: '/foo' });
+      const cookie = new Cookie({ data: { foo: 'bar' }, path: '/foo' });
 
       assert.strictEqual(typeof cookie, 'object');
       assert.strictEqual(typeof cookie.data, 'object');
@@ -58,15 +58,15 @@ describe('new Cookie()', function () {
 
     describe('expires', function () {
       it('should set expires', function () {
-        var expires = new Date(Date.now() + 60000);
-        var cookie = new Cookie({ expires: expires });
+        const expires = new Date(Date.now() + 60000);
+        const cookie = new Cookie({ expires });
 
         assert.strictEqual(cookie.expires, expires);
       });
 
       it('should set maxAge', function () {
-        var expires = new Date(Date.now() + 60000);
-        var cookie = new Cookie({ expires: expires });
+        const expires = new Date(Date.now() + 60000);
+        const cookie = new Cookie({ expires });
 
         assert.ok(expires.getTime() - Date.now() - 1000 <= cookie.maxAge);
         assert.ok(expires.getTime() - Date.now() + 1000 >= cookie.maxAge);
@@ -75,7 +75,7 @@ describe('new Cookie()', function () {
 
     describe('httpOnly', function () {
       it('should set httpOnly', function () {
-        var cookie = new Cookie({ httpOnly: false });
+        const cookie = new Cookie({ httpOnly: false });
 
         assert.strictEqual(cookie.httpOnly, false);
       });
@@ -83,16 +83,16 @@ describe('new Cookie()', function () {
 
     describe('maxAge', function () {
       it('should set expires', function () {
-        var maxAge = 60000;
-        var cookie = new Cookie({ maxAge: maxAge });
+        const maxAge = 60000;
+        const cookie = new Cookie({ maxAge });
 
         assert.ok(cookie.expires.getTime() - Date.now() - 1000 <= maxAge);
         assert.ok(cookie.expires.getTime() - Date.now() + 1000 >= maxAge);
       });
 
       it('should set maxAge', function () {
-        var maxAge = 60000;
-        var cookie = new Cookie({ maxAge: maxAge });
+        const maxAge = 60000;
+        const cookie = new Cookie({ maxAge });
 
         assert.strictEqual(typeof cookie.maxAge, 'number');
         assert.ok(cookie.maxAge - 1000 <= maxAge);
@@ -100,8 +100,8 @@ describe('new Cookie()', function () {
       });
 
       it('should accept Date object', function () {
-        var maxAge = new Date(Date.now() + 60000);
-        var cookie = new Cookie({ maxAge: maxAge });
+        const maxAge = new Date(Date.now() + 60000);
+        const cookie = new Cookie({ maxAge });
 
         assert.strictEqual(cookie.expires.getTime(), maxAge.getTime());
         assert.ok(maxAge.getTime() - Date.now() - 1000 <= cookie.maxAge);
@@ -116,14 +116,14 @@ describe('new Cookie()', function () {
           new Cookie({ maxAge: true });
         }, /maxAge/);
         assert.throws(function () {
-          new Cookie({ maxAge: function () {} });
+          new Cookie({ maxAge() {} });
         }, /maxAge/);
       });
     });
 
     describe('partitioned', function () {
       it('should set partitioned', function () {
-        var cookie = new Cookie({ partitioned: true });
+        const cookie = new Cookie({ partitioned: true });
 
         assert.strictEqual(cookie.partitioned, true);
       });
@@ -131,7 +131,7 @@ describe('new Cookie()', function () {
 
     describe('path', function () {
       it('should set path', function () {
-        var cookie = new Cookie({ path: '/foo' });
+        const cookie = new Cookie({ path: '/foo' });
 
         assert.strictEqual(cookie.path, '/foo');
       });
@@ -139,7 +139,7 @@ describe('new Cookie()', function () {
 
     describe('priority', function () {
       it('should set priority', function () {
-        var cookie = new Cookie({ priority: 'high' });
+        const cookie = new Cookie({ priority: 'high' });
 
         assert.strictEqual(cookie.priority, 'high');
       });

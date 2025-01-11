@@ -11,8 +11,8 @@
  * Module dependencies.
  */
 
-var cookie = require('cookie');
-var deprecate = require('depd')('connect-session');
+const cookie = require('cookie');
+const deprecate = require('depd')('connect-session');
 
 /**
  * Initialize a new `Cookie` with the given `options`.
@@ -22,7 +22,7 @@ var deprecate = require('depd')('connect-session');
  * @api private
  */
 
-var Cookie = (module.exports = function Cookie(options) {
+const Cookie = (module.exports = function Cookie(options) {
   this.path = '/';
   this.maxAge = null;
   this.httpOnly = true;
@@ -32,7 +32,7 @@ var Cookie = (module.exports = function Cookie(options) {
       throw new TypeError('argument options must be a object');
     }
 
-    for (var key in options) {
+    for (const key in options) {
       if (key !== 'data') {
         this[key] = options[key];
       }
@@ -130,7 +130,7 @@ Cookie.prototype = {
    * @api public
    */
 
-  serialize: function (name, val) {
+  serialize(name, val) {
     return cookie.serialize(name, val, this.data);
   },
 
@@ -141,7 +141,7 @@ Cookie.prototype = {
    * @api private
    */
 
-  toJSON: function () {
+  toJSON() {
     return this.data;
   }
 };

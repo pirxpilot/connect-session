@@ -4,17 +4,17 @@ module.exports.parseSetCookie = parseSetCookie;
 module.exports.writePatch = writePatch;
 
 function parseSetCookie(header) {
-  var match;
-  var pairs = [];
-  var pattern = /\s*([^=;]+)(?:=([^;]*);?|;|$)/g;
+  let match;
+  const pairs = [];
+  const pattern = /\s*([^=;]+)(?:=([^;]*);?|;|$)/g;
 
   while ((match = pattern.exec(header))) {
     pairs.push({ name: match[1], value: match[2] });
   }
 
-  var cookie = pairs.shift();
+  const cookie = pairs.shift();
 
-  for (var i = 0; i < pairs.length; i++) {
+  for (let i = 0; i < pairs.length; i++) {
     match = pairs[i];
     cookie[match.name.toLowerCase()] = match.value || true;
   }
@@ -23,9 +23,9 @@ function parseSetCookie(header) {
 }
 
 function writePatch(res) {
-  var _end = res.end;
-  var _write = res.write;
-  var ended = false;
+  const _end = res.end;
+  const _write = res.write;
+  let ended = false;
 
   res.end = function end() {
     ended = true;

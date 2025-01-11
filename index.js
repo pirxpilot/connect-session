@@ -13,24 +13,24 @@
  * @private
  */
 
-var Buffer = require('node:buffer').Buffer;
-var cookie = require('cookie');
-var crypto = require('crypto');
-var debug = require('debug')('connect-session');
-var deprecate = require('depd')('connect-session');
-var onHeaders = require('on-headers');
-var parseUrl = require('parseurl');
-var signature = require('cookie-signature');
-var uid = require('uid-safe').sync;
+const Buffer = require('node:buffer').Buffer;
+const cookie = require('cookie');
+const crypto = require('crypto');
+const debug = require('debug')('connect-session');
+const deprecate = require('depd')('connect-session');
+const onHeaders = require('on-headers');
+const parseUrl = require('parseurl');
+const signature = require('cookie-signature');
+const uid = require('uid-safe').sync;
 
-var Cookie = require('./session/cookie');
-var MemoryStore = require('./session/memory');
-var Session = require('./session/session');
-var Store = require('./session/store');
+const Cookie = require('./session/cookie');
+const MemoryStore = require('./session/memory');
+const Session = require('./session/session');
+const Store = require('./session/store');
 
 // environment
 
-var env = process.env.NODE_ENV;
+const env = process.env.NODE_ENV;
 
 /**
  * Expose the middleware.
@@ -52,7 +52,7 @@ exports.MemoryStore = MemoryStore;
  * @private
  */
 
-var warning =
+const warning =
   'Warning: connect.session() MemoryStore is not\n' +
   'designed for a production environment, as it will leak\n' +
   'memory, and will not scale past a single process.';
@@ -63,7 +63,7 @@ var warning =
  */
 
 /* istanbul ignore next */
-var defer =
+const defer =
   typeof setImmediate === 'function' ?
   setImmediate :
   function (fn) {
@@ -89,34 +89,34 @@ var defer =
  */
 
 function session(options) {
-  var opts = options || {};
+  const opts = options || {};
 
   // get the cookie options
-  var cookieOptions = opts.cookie || {};
+  const cookieOptions = opts.cookie || {};
 
   // get the session id generate function
-  var generateId = opts.genid || generateSessionId;
+  const generateId = opts.genid || generateSessionId;
 
   // get the session cookie name
-  var name = opts.name || opts.key || 'connect.sid';
+  const name = opts.name || opts.key || 'connect.sid';
 
   // get the session store
-  var store = opts.store || new MemoryStore();
+  const store = opts.store || new MemoryStore();
 
   // get the trust proxy setting
-  var trustProxy = opts.proxy;
+  const trustProxy = opts.proxy;
 
   // get the resave session option
-  var resaveSession = opts.resave;
+  let resaveSession = opts.resave;
 
   // get the rolling session option
-  var rollingSessions = Boolean(opts.rolling);
+  const rollingSessions = Boolean(opts.rolling);
 
   // get the save uninitialized session option
-  var saveUninitializedSession = opts.saveUninitialized;
+  let saveUninitializedSession = opts.saveUninitialized;
 
   // get the cookie signing secret
-  var secret = opts.secret;
+  let secret = opts.secret;
 
   if (typeof generateId !== 'function') {
     throw new TypeError('genid option must be a function');
@@ -137,7 +137,7 @@ function session(options) {
   }
 
   // TODO: switch to "destroy" on next major
-  var unsetDestroy = opts.unset === 'destroy';
+  const unsetDestroy = opts.unset === 'destroy';
 
   if (Array.isArray(secret) && secret.length === 0) {
     throw new TypeError('secret option array must contain one or more strings');
@@ -169,10 +169,10 @@ function session(options) {
     }
   };
 
-  var storeImplementsTouch = typeof store.touch === 'function';
+  const storeImplementsTouch = typeof store.touch === 'function';
 
   // register event listeners for the store to track readiness
-  var storeReady = true;
+  let storeReady = true;
   store.on('disconnect', function ondisconnect() {
     storeReady = false;
   });
@@ -196,7 +196,7 @@ function session(options) {
     }
 
     // pathname mismatch
-    var originalPath = parseUrl.original(req).pathname || '/';
+    const originalPath = parseUrl.original(req).pathname || '/';
     if (originalPath.indexOf(cookieOptions.path || '/') !== 0) {
       debug('pathname mismatch');
       next();
@@ -211,18 +211,18 @@ function session(options) {
 
     // backwards compatibility for signed cookies
     // req.secret is passed from the cookie parser middleware
-    var secrets = secret || [req.secret];
+    const secrets = secret || [req.secret];
 
-    var originalHash;
-    var originalId;
-    var savedHash;
-    var touched = false;
+    let originalHash;
+    let originalId;
+    let savedHash;
+    let touched = false;
 
     // expose store
     req.sessionStore = store;
 
     // get the session ID from the cookie
-    var cookieId = (req.sessionID = getcookie(req, name, secrets));
+    const cookieId = (req.sessionID = getcookie(req, name, secrets));
 
     // set-cookie
     onHeaders(res, function () {
@@ -256,9 +256,9 @@ function session(options) {
     });
 
     // proxy end() to commit the session
-    var _end = res.end;
-    var _write = res.write;
-    var ended = false;
+    const _end = res.end;
+    const _write = res.write;
+    let ended = false;
     res.end = function end(chunk, encoding) {
       if (ended) {
         return false;
@@ -266,8 +266,8 @@ function session(options) {
 
       ended = true;
 
-      var ret;
-      var sync = true;
+      let ret;
+      let sync = true;
 
       function writeend() {
         if (sync) {
@@ -293,7 +293,7 @@ function session(options) {
           return ret;
         }
 
-        var contentLength = Number(res.getHeader('Content-Length'));
+        const contentLength = Number(res.getHeader('Content-Length'));
 
         if (!isNaN(contentLength) && contentLength > 0) {
           // measure chunk
@@ -402,8 +402,8 @@ function session(options) {
 
     // wrap session methods
     function wrapmethods(sess) {
-      var _reload = sess.reload;
-      var _save = sess.save;
+      const _reload = sess.reload;
+      const _save = sess.save;
 
       function reload(callback) {
         debug('reloading %s', this.id);
@@ -537,13 +537,13 @@ function generateSessionId() {
  */
 
 function getcookie(req, name, secrets) {
-  var header = req.headers.cookie;
-  var raw;
-  var val;
+  const header = req.headers.cookie;
+  let raw;
+  let val;
 
   // read from cookie header
   if (header) {
-    var cookies = cookie.parse(header);
+    const cookies = cookie.parse(header);
 
     raw = cookies[name];
 
@@ -605,7 +605,7 @@ function getcookie(req, name, secrets) {
 
 function hash(sess) {
   // serialize
-  var str = JSON.stringify(sess, function (key, val) {
+  const str = JSON.stringify(sess, function (key, val) {
     // ignore sess.cookie property
     if (this === sess && key === 'cookie') {
       return;
@@ -644,9 +644,9 @@ function issecure(req, trustProxy) {
   }
 
   // read the proto from x-forwarded-proto header
-  var header = req.headers['x-forwarded-proto'] || '';
-  var index = header.indexOf(',');
-  var proto =
+  const header = req.headers['x-forwarded-proto'] || '';
+  const index = header.indexOf(',');
+  const proto =
     index !== -1 ? header.substr(0, index).toLowerCase().trim() : header.toLowerCase().trim();
 
   return proto === 'https';
@@ -659,13 +659,13 @@ function issecure(req, trustProxy) {
  */
 
 function setcookie(res, name, val, secret, options) {
-  var signed = 's:' + signature.sign(val, secret);
-  var data = cookie.serialize(name, signed, options);
+  const signed = 's:' + signature.sign(val, secret);
+  const data = cookie.serialize(name, signed, options);
 
   debug('set-cookie %s', data);
 
-  var prev = res.getHeader('Set-Cookie') || [];
-  var header = Array.isArray(prev) ? prev.concat(data) : [prev, data];
+  const prev = res.getHeader('Set-Cookie') || [];
+  const header = Array.isArray(prev) ? prev.concat(data) : [prev, data];
 
   res.setHeader('Set-Cookie', header);
 }
@@ -679,8 +679,8 @@ function setcookie(res, name, val, secret, options) {
  * @private
  */
 function unsigncookie(val, secrets) {
-  for (var i = 0; i < secrets.length; i++) {
-    var result = signature.unsign(val, secrets[i]);
+  for (let i = 0; i < secrets.length; i++) {
+    const result = signature.unsign(val, secrets[i]);
 
     if (result !== false) {
       return result;
