@@ -22,13 +22,10 @@
     "uid-safe": "~2.1.5"
   },
   "devDependencies": {
+    "@pirxpilot/jshint": "~3",
     "after": "0.8.2",
     "cookie-parser": "1.4.6",
-    "eslint": "8.56.0",
-    "eslint-plugin-markdown": "3.0.1",
     "express": "4.17.3",
-    "mocha": "10.2.0",
-    "nyc": "15.1.0",
     "supertest": "6.3.4"
   },
   "files": [
@@ -40,10 +37,6 @@
     "node": ">= 0.8.0"
   },
   "scripts": {
-    "lint": "eslint . && node ./scripts/lint-readme.js",
-    "test": "mocha --require test/support/env --check-leaks --bail --no-exit --reporter spec test/",
-    "test-ci": "nyc --reporter=lcov --reporter=text npm test",
-    "test-cov": "nyc npm test",
-    "version": "node scripts/version-history.js && git add HISTORY.md"
+    "test": "make check"
   }
 }
