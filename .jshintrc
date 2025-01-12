@@ -1,0 +1,7 @@
+{
+  "esversion": 12,
+  "undef": true,
+  "unused": "vars",
+  "-W040": false,
+  "node": true
+}
