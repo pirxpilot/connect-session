@@ -21,7 +21,7 @@ const deprecate = require('depd')('connect-session');
 const onHeaders = require('on-headers');
 const parseUrl = require('parseurl');
 const signature = require('cookie-signature');
-const uid = require('ufid').generator(24);
+const uid = require('ufid').generator({ size: 24 });
 
 const Cookie = require('./session/cookie');
 const MemoryStore = require('./session/memory');
