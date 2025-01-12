@@ -12,7 +12,7 @@
  */
 
 var cookie = require('cookie')
-var deprecate = require('depd')('express-session')
+var deprecate = require('depd')('connect-session')
 
 /**
  * Initialize a new `Cookie` with the given `options`.

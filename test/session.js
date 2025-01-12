@@ -2090,7 +2090,7 @@ describe('session()', function(){
           var createConnection = agent.createConnection
 
           agent.createConnection = function (options) {
-            options.servername = 'express-session.local'
+            options.servername = 'connect-session.local'
             return createConnection.call(this, options)
           }
 
