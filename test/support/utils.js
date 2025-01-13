@@ -1,7 +1,12 @@
 'use strict';
 
-module.exports.parseSetCookie = parseSetCookie;
-module.exports.writePatch = writePatch;
+module.exports = {
+  cookie,
+  sid,
+  expires,
+  parseSetCookie,
+  writePatch
+};
 
 function parseSetCookie(header) {
   let match;
@@ -39,4 +44,23 @@ function writePatch(res) {
 
     return _write.apply(this, arguments);
   };
+}
+
+/* global unescape */
+function sid(res) {
+  const header = cookie(res);
+  const data = header && parseSetCookie(header);
+  const value = data && unescape(data.value);
+  const sid = value && value.substring(2, value.indexOf('.'));
+  return sid || undefined;
+}
+
+function cookie(res) {
+  const setCookie = res.headers['set-cookie'];
+  return (setCookie && setCookie[0]) || undefined;
+}
+
+function expires(res) {
+  const header = cookie(res);
+  return header && parseSetCookie(header).expires;
 }

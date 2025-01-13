@@ -14,6 +14,27 @@ const SyncStore = require('./support/sync-store');
 const utils = require('./support/utils');
 
 const Cookie = require('../session/cookie');
+const {
+  shouldSetSessionInStore,
+  shouldNotHaveHeader,
+  shouldNotSetSessionInStore,
+  shouldSetCookie,
+  shouldSetCookieToDifferentSessionId,
+  shouldSetCookieToExpireIn,
+  shouldSetCookieToValue,
+  shouldSetCookieWithAttribute,
+  shouldSetCookieWithAttributeAndValue,
+  shouldSetCookieWithoutAttribute
+} = require('./support/should');
+
+const { cookie } = utils;
+
+const {
+  createServer,
+  createSession,
+  createRequestListener,
+  mountAt
+} = require('./support/server');
 
 const min = 60 * 1000;
 
@@ -221,7 +242,7 @@ describe('session()', function () {
   it('should not save with bogus req.sessionID', function (_, done) {
     const store = new session.MemoryStore();
     const server = createServer({ store }, function (req, res) {
-      req.sessionID = function () {};
+      req.sessionID = function () { };
       req.session.test1 = 1;
       req.session.test2 = 'b';
       res.end();
@@ -254,7 +275,7 @@ describe('session()', function () {
       .expect(shouldSetCookie('connect.sid'))
       .expect(200, function (err, res) {
         if (err) return done(err);
-        const originalExpires = expires(res);
+        const originalExpires = utils.expires(res);
         setTimeout(
           function () {
             request(server)
@@ -262,7 +283,7 @@ describe('session()', function () {
               .set('Cookie', cookie(res))
               .expect(shouldSetCookie('connect.sid'))
               .expect(function (res) {
-                assert.notStrictEqual(originalExpires, expires(res));
+                assert.notStrictEqual(originalExpires, utils.expires(res));
               })
               .expect(200, done);
           },
@@ -348,7 +369,7 @@ describe('session()', function () {
             if (err) return done(err);
             assert.ok(sess, 'session saved to store');
             const exp = new Date(sess.cookie.expires);
-            assert.strictEqual(exp.toUTCString(), expires(res));
+            assert.strictEqual(exp.toUTCString(), utils.expires(res));
             setTimeout(
               function () {
                 request(server)
@@ -416,7 +437,7 @@ describe('session()', function () {
               .get('/')
               .set('Cookie', cookie(res))
               .expect(shouldSetCookie('connect.sid'))
-              .expect(shouldSetCookieToDifferentSessionId(sid(res)))
+              .expect(shouldSetCookieToDifferentSessionId(utils.sid(res)))
               .expect(200, 'session 2', done);
           });
         });
@@ -437,7 +458,7 @@ describe('session()', function () {
         .expect(shouldSetCookie('sessid'))
         .expect(200, 'session created', function (err, res) {
           if (err) return done(err);
-          const val = sid(res);
+          const val = utils.sid(res);
           assert.ok(val);
           request(server)
             .get('/')
@@ -515,7 +536,7 @@ describe('session()', function () {
               .get('/')
               .set('Cookie', cookie(res))
               .expect(shouldSetCookie('connect.sid'))
-              .expect(shouldSetCookieToDifferentSessionId(sid(res)))
+              .expect(shouldSetCookieToDifferentSessionId(utils.sid(res)))
               .expect(200, 'session 2', done);
           }, 15);
         });
@@ -559,7 +580,7 @@ describe('session()', function () {
         .expect(shouldSetCookie('connect.sid'))
         .expect(200, 'session 1', function (err, res) {
           if (err) return done(err);
-          store.set(sid(res), { foo: 'bar' }, function (err) {
+          store.set(utils.sid(res), { foo: 'bar' }, function (err) {
             if (err) return done(err);
             request(server)
               .get('/')
@@ -1472,7 +1493,7 @@ describe('session()', function () {
         .get('/')
         .expect(200, 'hits: 1', function (err, res) {
           if (err) return done(err);
-          store.load(sid(res), function (err, sess) {
+          store.load(utils.sid(res), function (err, sess) {
             if (err) return done(err);
             assert.ok(sess);
             request(server).get('/').set('Cookie', cookie(res)).expect(200, 'hits: 2', done);
@@ -1603,7 +1624,7 @@ describe('session()', function () {
               .get('/')
               .set('Cookie', cookie(res))
               .expect(shouldSetCookie('connect.sid'))
-              .expect(shouldSetCookieToDifferentSessionId(sid(res)))
+              .expect(shouldSetCookieToDifferentSessionId(utils.sid(res)))
               .expect(200, 'false', done);
           });
       });
@@ -1826,7 +1847,7 @@ describe('session()', function () {
           .get('/')
           .expect(200, function (err, res) {
             if (err) return done(err);
-            const id = sid(res);
+            const id = utils.sid(res);
             store.get(id, function (err, sess) {
               if (err) return done(err);
               const exp = new Date(sess.cookie.expires);
@@ -2330,7 +2351,7 @@ describe('session()', function () {
           if (err) return done(err);
           request(app)
             .get('/')
-            .set('Cookie', 'sessid=' + sid(res))
+            .set('Cookie', 'sessid=' + utils.sid(res))
             .expect(200, '1', done);
         });
     });
@@ -2381,212 +2402,3 @@ describe('session()', function () {
     });
   });
 });
-
-function cookie(res) {
-  const setCookie = res.headers['set-cookie'];
-  return (setCookie && setCookie[0]) || undefined;
-}
-
-function createServer(options, respond) {
-  let fn = respond;
-  let opts = options;
-  const server = http.createServer();
-
-  // setup, options, respond
-  if (typeof arguments[0] === 'function') {
-    opts = arguments[1];
-    fn = arguments[2];
-
-    server.on('request', arguments[0]);
-  }
-
-  return server.on('request', createRequestListener(opts, fn));
-}
-
-function createRequestListener(opts, fn) {
-  const _session = createSession(opts);
-  const respond = fn || end;
-
-  return function onRequest(req, res) {
-    const server = this;
-
-    _session(req, res, function (err) {
-      if (err && !res._header) {
-        res.statusCode = err.status || 500;
-        res.end(err.message);
-        return;
-      }
-
-      if (err) {
-        server.emit('error', err);
-        return;
-      }
-
-      respond(req, res);
-    });
-  };
-}
-
-function createSession(opts) {
-  const options = opts || {};
-
-  if (!('cookie' in options)) {
-    options.cookie = { maxAge: 60 * 1000 };
-  }
-
-  if (!('secret' in options)) {
-    options.secret = 'keyboard cat';
-  }
-
-  return session(options);
-}
-
-function end(req, res) {
-  res.end();
-}
-
-function expires(res) {
-  const header = cookie(res);
-  return header && utils.parseSetCookie(header).expires;
-}
-
-function mountAt(path) {
-  return function (req, res) {
-    if (req.url.indexOf(path) === 0) {
-      req.originalUrl = req.url;
-      req.url = req.url.slice(path.length);
-    }
-  };
-}
-
-function shouldNotHaveHeader(header) {
-  return function (res) {
-    assert.ok(!(header.toLowerCase() in res.headers), 'should not have ' + header + ' header');
-  };
-}
-
-function shouldNotSetSessionInStore(store) {
-  const _set = store.set;
-  let count = 0;
-
-  store.set = function set() {
-    count++;
-    return _set.apply(this, arguments);
-  };
-
-  return function () {
-    assert.ok(count === 0, 'should not set session in store');
-  };
-}
-
-function shouldSetCookie(name) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-  };
-}
-
-function shouldSetCookieToDifferentSessionId(id) {
-  return function (res) {
-    assert.notStrictEqual(sid(res), id);
-  };
-}
-
-function shouldSetCookieToExpireIn(name, delta) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok('expires' in data, 'should set cookie with attribute Expires');
-    assert.ok('date' in res.headers, 'should have a date header');
-    assert.strictEqual(
-      Date.parse(data.expires) - Date.parse(res.headers.date),
-      delta,
-      'should set cookie ' + name + ' to expire in ' + delta + ' ms'
-    );
-  };
-}
-
-function shouldSetCookieToValue(name, val) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.strictEqual(data.value, val, 'should set cookie ' + name + ' to ' + val);
-  };
-}
-
-function shouldSetCookieWithAttribute(name, attrib) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(attrib.toLowerCase() in data, 'should set cookie with attribute ' + attrib);
-  };
-}
-
-function shouldSetCookieWithAttributeAndValue(name, attrib, value) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(attrib.toLowerCase() in data, 'should set cookie with attribute ' + attrib);
-    assert.strictEqual(
-      data[attrib.toLowerCase()],
-      value,
-      'should set cookie with attribute ' + attrib + ' set to ' + value
-    );
-  };
-}
-
-function shouldSetCookieWithoutAttribute(name, attrib) {
-  return function (res) {
-    const header = cookie(res);
-    const data = header && utils.parseSetCookie(header);
-    assert.ok(header, 'should have a cookie header');
-    assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(!(attrib.toLowerCase() in data), 'should set cookie without attribute ' + attrib);
-  };
-}
-
-function shouldSetSessionInStore(store, delay) {
-  const _set = store.set;
-  let count = 0;
-
-  store.set = function set() {
-    count++;
-
-    if (!delay) {
-      return _set.apply(this, arguments);
-    }
-
-    const args = new Array(arguments.length + 1);
-
-    args[0] = this;
-    for (let i = 1; i < args.length; i++) {
-      args[i] = arguments[i - 1];
-    }
-
-    setTimeout(_set.bind.apply(_set, args), delay);
-  };
-
-  return function () {
-    assert.ok(count === 1, 'should set session in store');
-  };
-}
-
-/* global unescape */
-
-function sid(res) {
-  const header = cookie(res);
-  const data = header && utils.parseSetCookie(header);
-  const value = data && unescape(data.value);
-  const sid = value && value.substring(2, value.indexOf('.'));
-  return sid || undefined;
-}
