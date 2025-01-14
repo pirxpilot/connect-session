@@ -1,4 +1,11 @@
 
+3.0.0 / 2025-01-14
+==================
+
+ * use res.cookie to actually write cookies
+ * assume cookie-parser is always used to parse cookies
+ * remove support for proxy option
+
 2.0.1 / 2025-01-12
 ==================
 
