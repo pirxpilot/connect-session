@@ -8,7 +8,7 @@ module.exports = {
   writePatch
 };
 
-function parseSetCookie(header) {
+function parseSetCookie(header = '') {
   let match;
   const pairs = [];
   const pattern = /\s*([^=;]+)(?:=([^;]*);?|;|$)/g;
@@ -46,21 +46,21 @@ function writePatch(res) {
   };
 }
 
-/* global unescape */
 function sid(res) {
   const header = cookie(res);
-  const data = header && parseSetCookie(header);
-  const value = data && unescape(data.value);
-  const sid = value && value.substring(2, value.indexOf('.'));
-  return sid || undefined;
+  const data = parseSetCookie(header);
+  if (!data) {
+    return;
+  }
+  const value = decodeURIComponent(data.value);
+  return value?.slice(2, value.indexOf('.'));
 }
 
 function cookie(res) {
-  const setCookie = res.headers['set-cookie'];
-  return (setCookie && setCookie[0]) || undefined;
+  return res.headers['set-cookie']?.[0];
 }
 
 function expires(res) {
   const header = cookie(res);
-  return header && parseSetCookie(header).expires;
+  return parseSetCookie(header).expires;
 }
