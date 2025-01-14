@@ -30,101 +30,6 @@ const min = 60 * 1000;
 
 describe('session options', function () {
 
-  describe('proxy option', function () {
-    describe('when enabled', function () {
-      let server;
-      before(function () {
-        server = createServer({ proxy: true, cookie: { secure: true, maxAge: 5 } });
-      });
-
-      it('should trust X-Forwarded-Proto when string', function (_, done) {
-        request(server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, done);
-      });
-
-      it('should trust X-Forwarded-Proto when comma-separated list', function (_, done) {
-        request(server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https,http')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, done);
-      });
-
-      it('should work when no header', function (_, done) {
-        request(server).get('/').expect(shouldNotHaveHeader('Set-Cookie')).expect(200, done);
-      });
-    });
-
-    describe('when disabled', function () {
-      const ctx = {};
-
-      before(function () {
-        function setup(req) {
-          req.secure = req.headers['x-secure'] ? JSON.parse(req.headers['x-secure']) : undefined;
-        }
-
-        function respond(req, res) {
-          res.end(String(req.secure));
-        }
-
-        ctx.server = createServer(setup, { proxy: false, cookie: { secure: true } }, respond);
-      });
-
-      it('should not trust X-Forwarded-Proto', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, done);
-      });
-
-      it('should ignore req.secure', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https')
-          .set('X-Secure', 'true')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, 'true', done);
-      });
-    });
-
-    describe('when unspecified', function () {
-      const ctx = {};
-
-      before(function () {
-        function setup(req) {
-          req.secure = req.headers['x-secure'] ? JSON.parse(req.headers['x-secure']) : undefined;
-        }
-
-        function respond(req, res) {
-          res.end(String(req.secure));
-        }
-
-        ctx.server = createServer(setup, { cookie: { secure: true } }, respond);
-      });
-
-      it('should not trust X-Forwarded-Proto', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, done);
-      });
-
-      it('should use req.secure', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Forwarded-Proto', 'https')
-          .set('X-Secure', 'true')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, 'true', done);
-      });
-    });
-  });
-
   describe('cookie option', function () {
     describe('when "path" set to "/foo/bar"', function () {
       const ctx = {};
@@ -183,62 +88,32 @@ describe('session options', function () {
     describe('when "secure" set to "auto"', function () {
       const ctx = {};
 
-      describe('when "proxy" is "true"', function () {
-        before(function () {
-          ctx.server = createServer({ proxy: true, cookie: { maxAge: 5, secure: 'auto' } });
-        });
+      before(function () {
+        function setup(req) {
+          req.secure = JSON.parse(req.headers['x-secure']);
+        }
 
-        it('should set secure when X-Forwarded-Proto is https', function (_, done) {
-          request(ctx.server)
-            .get('/')
-            .set('X-Forwarded-Proto', 'https')
-            .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
-            .expect(200, done);
-        });
+        function respond(req, res) {
+          res.end(String(req.secure));
+        }
+
+        ctx.server = createServer(setup, { cookie: { secure: 'auto' } }, respond);
       });
 
-      describe('when "proxy" is "false"', function () {
-        before(function () {
-          ctx.server = createServer({ proxy: false, cookie: { maxAge: 5, secure: 'auto' } });
-        });
-
-        it('should not set secure when X-Forwarded-Proto is https', function (_, done) {
-          request(ctx.server)
-            .get('/')
-            .set('X-Forwarded-Proto', 'https')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
-            .expect(200, done);
-        });
+      it('should set secure if req.secure = true', function (_, done) {
+        request(ctx.server)
+          .get('/')
+          .set('X-Secure', 'true')
+          .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
+          .expect(200, 'true', done);
       });
 
-      describe('when "proxy" is undefined', function () {
-        before(function () {
-          function setup(req) {
-            req.secure = JSON.parse(req.headers['x-secure']);
-          }
-
-          function respond(req, res) {
-            res.end(String(req.secure));
-          }
-
-          ctx.server = createServer(setup, { cookie: { secure: 'auto' } }, respond);
-        });
-
-        it('should set secure if req.secure = true', function (_, done) {
-          request(ctx.server)
-            .get('/')
-            .set('X-Secure', 'true')
-            .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
-            .expect(200, 'true', done);
-        });
-
-        it('should not set secure if req.secure = false', function (_, done) {
-          request(ctx.server)
-            .get('/')
-            .set('X-Secure', 'false')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
-            .expect(200, 'false', done);
-        });
+      it('should not set secure if req.secure = false', function (_, done) {
+        request(ctx.server)
+          .get('/')
+          .set('X-Secure', 'false')
+          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
+          .expect(200, 'false', done);
       });
     });
   });

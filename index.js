@@ -64,7 +64,6 @@ const warning =
  * @param {Object} [options.cookie] Options for cookie
  * @param {Function} [options.genid]
  * @param {String} [options.name=connect.sid] Session ID cookie name
- * @param {Boolean} [options.proxy]
  * @param {Boolean} [options.resave] Resave unmodified sessions back to the store
  * @param {Boolean} [options.rolling] Enable/disable rolling session expiration
  * @param {Boolean} [options.saveUninitialized] Save uninitialized sessions to the store
@@ -89,9 +88,6 @@ function session(options) {
 
   // get the session store
   const store = opts.store || new MemoryStore();
-
-  // get the trust proxy setting
-  const trustProxy = opts.proxy;
 
   // get the resave session option
   let resaveSession = opts.resave;
@@ -152,7 +148,7 @@ function session(options) {
     req.session.cookie = new Cookie(cookieOptions);
 
     if (cookieOptions.secure === 'auto') {
-      req.session.cookie.secure = issecure(req, trustProxy);
+      req.session.cookie.secure = req.secure;
     }
   };
 
@@ -223,7 +219,7 @@ function session(options) {
       }
 
       // only send secure cookies via https
-      if (req.session.cookie.secure && !issecure(req, trustProxy)) {
+      if (req.session.cookie.secure && !req.secure) {
         debug('not secured');
         return;
       }
@@ -603,40 +599,6 @@ function hash(sess) {
 
   // hash
   return crypto.createHash('sha1').update(str, 'utf8').digest('hex');
-}
-
-/**
- * Determine if request is secure.
- *
- * @param {Object} req
- * @param {Boolean} [trustProxy]
- * @return {Boolean}
- * @private
- */
-
-function issecure(req, trustProxy) {
-  // socket is https server
-  if (req.connection && req.connection.encrypted) {
-    return true;
-  }
-
-  // do not trust proxy
-  if (trustProxy === false) {
-    return false;
-  }
-
-  // no explicit trust; try req.secure from express
-  if (trustProxy !== true) {
-    return req.secure === true;
-  }
-
-  // read the proto from x-forwarded-proto header
-  const header = req.headers['x-forwarded-proto'] || '';
-  const index = header.indexOf(',');
-  const proto =
-    index !== -1 ? header.substr(0, index).toLowerCase().trim() : header.toLowerCase().trim();
-
-  return proto === 'https';
 }
 
 /**

@@ -3,9 +3,7 @@ const assert = require('node:assert');
 const request = require('supertest');
 const after = require('after');
 
-const fs = require('node:fs');
 const http = require('node:http');
-const https = require('node:https');
 
 const utils = require('../support/utils');
 const { cookie } = utils;
@@ -425,7 +423,8 @@ describe('req.session', function () {
   describe('.cookie', function () {
     describe('.*', function () {
       it('should serialize as parameters', function (_, done) {
-        const server = createServer({ proxy: true }, function (req, res) {
+        const server = createServer({}, function (req, res) {
+          req.secure = true;
           req.session.cookie.httpOnly = false;
           req.session.cookie.secure = true;
           res.end();
@@ -433,7 +432,6 @@ describe('req.session', function () {
 
         request(server)
           .get('/')
-          .set('X-Forwarded-Proto', 'https')
           .expect(shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly'))
           .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
           .expect(200, done);
@@ -625,29 +623,6 @@ describe('req.session', function () {
 
       before(function () {
         app = createRequestListener({ secret: 'keyboard cat', cookie: { secure: true } });
-      });
-
-      it('should set cookie when secure', function (_, done) {
-        const cert = fs.readFileSync(__dirname + '/../fixtures/server.crt', 'ascii');
-        const server = https.createServer({
-          key: fs.readFileSync(__dirname + '/../fixtures/server.key', 'ascii'),
-          cert
-        });
-
-        server.on('request', app);
-
-        const agent = new https.Agent({ ca: cert });
-        const createConnection = agent.createConnection;
-
-        agent.createConnection = function (options) {
-          options.servername = 'connect-session.local';
-          return createConnection.call(this, options);
-        };
-
-        const req = request(server).get('/');
-        req.agent(agent);
-        req.expect(shouldSetCookie('connect.sid'));
-        req.expect(200, done);
       });
 
       it('should not set-cookie when insecure', function (_, done) {
