@@ -4,7 +4,7 @@ const utils = require('../support/utils');
 const { cookie } = utils;
 
 const cookieParser = require('cookie-parser');
-const express = require('express');
+const connect = require('@pirxpilot/connect');
 
 const {
   createSession
@@ -12,7 +12,7 @@ const {
 
 describe('cookieParser()', function () {
   it('should read from req.cookies', function (_, done) {
-    const app = express()
+    const app = connect()
       .use(cookieParser())
       .use(function (req, res, next) {
         req.headers.cookie = 'foo=bar';
@@ -34,7 +34,7 @@ describe('cookieParser()', function () {
   });
 
   it('should reject unsigned from req.cookies', function (_, done) {
-    const app = express()
+    const app = connect()
       .use(cookieParser())
       .use(function (req, res, next) {
         req.headers.cookie = 'foo=bar';
@@ -59,7 +59,7 @@ describe('cookieParser()', function () {
   });
 
   it('should reject invalid signature from req.cookies', function (_, done) {
-    const app = express()
+    const app = connect()
       .use(cookieParser())
       .use(function (req, res, next) {
         req.headers.cookie = 'foo=bar';
@@ -82,7 +82,7 @@ describe('cookieParser()', function () {
   });
 
   it('should read from req.signedCookies', function (_, done) {
-    const app = express()
+    const app = connect()
       .use(cookieParser('keyboard cat'))
       .use(function (req, res, next) {
         delete req.headers.cookie;
