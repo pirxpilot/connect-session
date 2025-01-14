@@ -3,14 +3,6 @@
 const session = require('../../');
 const util = require('util');
 
-/* istanbul ignore next */
-const defer =
-  typeof setImmediate === 'function' ?
-  setImmediate :
-  function (fn) {
-    process.nextTick(fn.bind.apply(fn, arguments));
-  };
-
 module.exports = SmartStore;
 
 function SmartStore() {
@@ -22,7 +14,7 @@ util.inherits(SmartStore, session.Store);
 
 SmartStore.prototype.destroy = function destroy(sid, callback) {
   delete this.sessions[sid];
-  defer(callback, null);
+  setImmediate(callback, null);
 };
 
 SmartStore.prototype.get = function get(sid, callback) {
@@ -47,10 +39,10 @@ SmartStore.prototype.get = function get(sid, callback) {
     }
   }
 
-  defer(callback, null, sess);
+  setImmediate(callback, null, sess);
 };
 
 SmartStore.prototype.set = function set(sid, sess, callback) {
   this.sessions[sid] = JSON.stringify(sess);
-  defer(callback, null);
+  setImmediate(callback, null);
 };
