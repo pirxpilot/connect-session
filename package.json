@@ -1,7 +1,7 @@
 {
   "name": "@pirxpilot/connect-session",
   "version": "2.0.1",
-  "description": "Simple session middleware for Express",
+  "description": "Simple session middleware for Connect/Express",
   "author": "TJ Holowaychuk <tj@vision-media.ca> (http://tjholowaychuk.com)",
   "contributors": [
     "Douglas Christopher Wilson <doug@somethingdoug.com>",
@@ -13,8 +13,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "cookie": "~0",
-    "cookie-signature": "~1",
     "debug": "~4",
     "depd": "~2",
     "on-headers": "~1",
@@ -22,10 +20,12 @@
     "ufid": "^1.1.2"
   },
   "devDependencies": {
+    "@pirxpilot/connect": "~4",
     "@pirxpilot/jshint": "~3",
     "after": "~0",
+    "cookie": "~1",
     "cookie-parser": "~1",
-    "express": "~4",
+    "cookie-signature": "~1",
     "supertest": "~7"
   },
   "files": [

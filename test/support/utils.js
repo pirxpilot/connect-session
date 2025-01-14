@@ -1,9 +1,14 @@
 'use strict';
 
-module.exports.parseSetCookie = parseSetCookie;
-module.exports.writePatch = writePatch;
+module.exports = {
+  cookie,
+  sid,
+  expires,
+  parseSetCookie,
+  writePatch
+};
 
-function parseSetCookie(header) {
+function parseSetCookie(header = '') {
   let match;
   const pairs = [];
   const pattern = /\s*([^=;]+)(?:=([^;]*);?|;|$)/g;
@@ -39,4 +44,23 @@ function writePatch(res) {
 
     return _write.apply(this, arguments);
   };
+}
+
+function sid(res) {
+  const header = cookie(res);
+  const data = parseSetCookie(header);
+  if (!data) {
+    return;
+  }
+  const value = decodeURIComponent(data.value);
+  return value?.slice(2, value.indexOf('.'));
+}
+
+function cookie(res) {
+  return res.headers['set-cookie']?.[0];
+}
+
+function expires(res) {
+  const header = cookie(res);
+  return parseSetCookie(header).expires;
 }

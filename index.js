@@ -14,13 +14,11 @@
  */
 
 const Buffer = require('node:buffer').Buffer;
-const cookie = require('cookie');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const debug = require('debug')('connect-session');
 const deprecate = require('depd')('connect-session');
 const onHeaders = require('on-headers');
 const parseUrl = require('parseurl');
-const signature = require('cookie-signature');
 const uid = require('ufid').generator({ size: 24 });
 
 const Cookie = require('./session/cookie');
@@ -58,30 +56,15 @@ const warning =
   'memory, and will not scale past a single process.';
 
 /**
- * Node.js 0.8+ async implementation.
- * @private
- */
-
-/* istanbul ignore next */
-const defer =
-  typeof setImmediate === 'function' ?
-  setImmediate :
-  function (fn) {
-    process.nextTick(fn.bind.apply(fn, arguments));
-  };
-
-/**
  * Setup session store with the given `options`.
  *
  * @param {Object} [options]
  * @param {Object} [options.cookie] Options for cookie
  * @param {Function} [options.genid]
  * @param {String} [options.name=connect.sid] Session ID cookie name
- * @param {Boolean} [options.proxy]
  * @param {Boolean} [options.resave] Resave unmodified sessions back to the store
  * @param {Boolean} [options.rolling] Enable/disable rolling session expiration
  * @param {Boolean} [options.saveUninitialized] Save uninitialized sessions to the store
- * @param {String|Array} [options.secret] Secret for signing session ID
  * @param {Object} [options.store=MemoryStore] Session store
  * @param {String} [options.unset]
  * @return {Function} middleware
@@ -103,9 +86,6 @@ function session(options) {
   // get the session store
   const store = opts.store || new MemoryStore();
 
-  // get the trust proxy setting
-  const trustProxy = opts.proxy;
-
   // get the resave session option
   let resaveSession = opts.resave;
 
@@ -114,9 +94,6 @@ function session(options) {
 
   // get the save uninitialized session option
   let saveUninitializedSession = opts.saveUninitialized;
-
-  // get the cookie signing secret
-  let secret = opts.secret;
 
   if (typeof generateId !== 'function') {
     throw new TypeError('genid option must be a function');
@@ -139,18 +116,6 @@ function session(options) {
   // TODO: switch to "destroy" on next major
   const unsetDestroy = opts.unset === 'destroy';
 
-  if (Array.isArray(secret) && secret.length === 0) {
-    throw new TypeError('secret option array must contain one or more strings');
-  }
-
-  if (secret && !Array.isArray(secret)) {
-    secret = [secret];
-  }
-
-  if (!secret) {
-    deprecate('req.secret; provide secret option');
-  }
-
   // notify user that this store is not
   // meant for a production environment
   /* istanbul ignore next: not tested */
@@ -165,7 +130,7 @@ function session(options) {
     req.session.cookie = new Cookie(cookieOptions);
 
     if (cookieOptions.secure === 'auto') {
-      req.session.cookie.secure = issecure(req, trustProxy);
+      req.session.cookie.secure = req.secure;
     }
   };
 
@@ -204,14 +169,10 @@ function session(options) {
     }
 
     // ensure a secret is available or bail
-    if (!secret && !req.secret) {
+    if (!req.secret) {
       next(new Error('secret option required for sessions'));
       return;
     }
-
-    // backwards compatibility for signed cookies
-    // req.secret is passed from the cookie parser middleware
-    const secrets = secret || [req.secret];
 
     let originalHash;
     let originalId;
@@ -222,7 +183,7 @@ function session(options) {
     req.sessionStore = store;
 
     // get the session ID from the cookie
-    const cookieId = (req.sessionID = getcookie(req, name, secrets));
+    const cookieId = (req.sessionID = getcookie(req, name));
 
     // set-cookie
     onHeaders(res, function () {
@@ -236,7 +197,7 @@ function session(options) {
       }
 
       // only send secure cookies via https
-      if (req.session.cookie.secure && !issecure(req, trustProxy)) {
+      if (req.session.cookie.secure && !req.secure) {
         debug('not secured');
         return;
       }
@@ -249,9 +210,9 @@ function session(options) {
 
       // set cookie
       try {
-        setcookie(res, name, req.sessionID, secrets[0], req.session.cookie.data);
+        res.cookie(name, req.sessionID, { ...req.session.cookie.data, signed: true });
       } catch (err) {
-        defer(next, err);
+        setImmediate(next, err);
       }
     });
 
@@ -319,7 +280,7 @@ function session(options) {
         debug('destroying');
         store.destroy(req.sessionID, function ondestroy(err) {
           if (err) {
-            defer(next, err);
+            setImmediate(next, err);
           }
 
           debug('destroyed');
@@ -344,7 +305,7 @@ function session(options) {
       if (shouldSave(req)) {
         req.session.save(function onsave(err) {
           if (err) {
-            defer(next, err);
+            setImmediate(next, err);
           }
 
           writeend();
@@ -356,7 +317,7 @@ function session(options) {
         debug('touching');
         store.touch(req.sessionID, req.session, function ontouch(err) {
           if (err) {
-            defer(next, err);
+            setImmediate(next, err);
           }
 
           debug('touched');
@@ -536,63 +497,9 @@ function generateSessionId() {
  * @private
  */
 
-function getcookie(req, name, secrets) {
-  const header = req.headers.cookie;
-  let raw;
-  let val;
-
-  // read from cookie header
-  if (header) {
-    const cookies = cookie.parse(header);
-
-    raw = cookies[name];
-
-    if (raw) {
-      if (raw.substr(0, 2) === 's:') {
-        val = unsigncookie(raw.slice(2), secrets);
-
-        if (val === false) {
-          debug('cookie signature invalid');
-          val = undefined;
-        }
-      } else {
-        debug('cookie unsigned');
-      }
-    }
-  }
-
-  // back-compat read from cookieParser() signedCookies data
-  if (!val && req.signedCookies) {
-    val = req.signedCookies[name];
-
-    if (val) {
-      deprecate('cookie should be available in req.headers.cookie');
-    }
-  }
-
-  // back-compat read from cookieParser() cookies data
-  if (!val && req.cookies) {
-    raw = req.cookies[name];
-
-    if (raw) {
-      if (raw.substr(0, 2) === 's:') {
-        val = unsigncookie(raw.slice(2), secrets);
-
-        if (val) {
-          deprecate('cookie should be available in req.headers.cookie');
-        }
-
-        if (val === false) {
-          debug('cookie signature invalid');
-          val = undefined;
-        }
-      } else {
-        debug('cookie unsigned');
-      }
-    }
-  }
-
-  return val;
+function getcookie(req, name) {
+  // read from cookieParser() signedCookies data
+  return req.signedCookies?.[name];
 }
 
 /**
@@ -616,76 +523,4 @@ function hash(sess) {
 
   // hash
   return crypto.createHash('sha1').update(str, 'utf8').digest('hex');
-}
-
-/**
- * Determine if request is secure.
- *
- * @param {Object} req
- * @param {Boolean} [trustProxy]
- * @return {Boolean}
- * @private
- */
-
-function issecure(req, trustProxy) {
-  // socket is https server
-  if (req.connection && req.connection.encrypted) {
-    return true;
-  }
-
-  // do not trust proxy
-  if (trustProxy === false) {
-    return false;
-  }
-
-  // no explicit trust; try req.secure from express
-  if (trustProxy !== true) {
-    return req.secure === true;
-  }
-
-  // read the proto from x-forwarded-proto header
-  const header = req.headers['x-forwarded-proto'] || '';
-  const index = header.indexOf(',');
-  const proto =
-    index !== -1 ? header.substr(0, index).toLowerCase().trim() : header.toLowerCase().trim();
-
-  return proto === 'https';
-}
-
-/**
- * Set cookie on response.
- *
- * @private
- */
-
-function setcookie(res, name, val, secret, options) {
-  const signed = 's:' + signature.sign(val, secret);
-  const data = cookie.serialize(name, signed, options);
-
-  debug('set-cookie %s', data);
-
-  const prev = res.getHeader('Set-Cookie') || [];
-  const header = Array.isArray(prev) ? prev.concat(data) : [prev, data];
-
-  res.setHeader('Set-Cookie', header);
-}
-
-/**
- * Verify and decode the given `val` with `secrets`.
- *
- * @param {String} val
- * @param {Array} secrets
- * @returns {String|Boolean}
- * @private
- */
-function unsigncookie(val, secrets) {
-  for (let i = 0; i < secrets.length; i++) {
-    const result = signature.unsign(val, secrets[i]);
-
-    if (result !== false) {
-      return result;
-    }
-  }
-
-  return false;
 }
