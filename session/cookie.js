@@ -11,7 +11,6 @@
  * Module dependencies.
  */
 
-const cookie = require('cookie');
 const deprecate = require('depd')('connect-session');
 
 /**
@@ -121,17 +120,6 @@ Cookie.prototype = {
       path: this.path,
       sameSite: this.sameSite
     };
-  },
-
-  /**
-   * Return a serialized cookie string.
-   *
-   * @return {String}
-   * @api public
-   */
-
-  serialize(name, val) {
-    return cookie.serialize(name, val, this.data);
   },
 
   /**

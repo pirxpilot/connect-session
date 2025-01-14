@@ -14,13 +14,11 @@
  */
 
 const Buffer = require('node:buffer').Buffer;
-const cookie = require('cookie');
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const debug = require('debug')('connect-session');
 const deprecate = require('depd')('connect-session');
 const onHeaders = require('on-headers');
 const parseUrl = require('parseurl');
-const signature = require('cookie-signature');
 const uid = require('ufid').generator({ size: 24 });
 
 const Cookie = require('./session/cookie');
@@ -67,7 +65,6 @@ const warning =
  * @param {Boolean} [options.resave] Resave unmodified sessions back to the store
  * @param {Boolean} [options.rolling] Enable/disable rolling session expiration
  * @param {Boolean} [options.saveUninitialized] Save uninitialized sessions to the store
- * @param {String|Array} [options.secret] Secret for signing session ID
  * @param {Object} [options.store=MemoryStore] Session store
  * @param {String} [options.unset]
  * @return {Function} middleware
@@ -98,9 +95,6 @@ function session(options) {
   // get the save uninitialized session option
   let saveUninitializedSession = opts.saveUninitialized;
 
-  // get the cookie signing secret
-  let secret = opts.secret;
-
   if (typeof generateId !== 'function') {
     throw new TypeError('genid option must be a function');
   }
@@ -121,18 +115,6 @@ function session(options) {
 
   // TODO: switch to "destroy" on next major
   const unsetDestroy = opts.unset === 'destroy';
-
-  if (Array.isArray(secret) && secret.length === 0) {
-    throw new TypeError('secret option array must contain one or more strings');
-  }
-
-  if (secret && !Array.isArray(secret)) {
-    secret = [secret];
-  }
-
-  if (!secret) {
-    deprecate('req.secret; provide secret option');
-  }
 
   // notify user that this store is not
   // meant for a production environment
@@ -187,14 +169,10 @@ function session(options) {
     }
 
     // ensure a secret is available or bail
-    if (!secret && !req.secret) {
+    if (!req.secret) {
       next(new Error('secret option required for sessions'));
       return;
     }
-
-    // backwards compatibility for signed cookies
-    // req.secret is passed from the cookie parser middleware
-    const secrets = secret || [req.secret];
 
     let originalHash;
     let originalId;
@@ -232,7 +210,7 @@ function session(options) {
 
       // set cookie
       try {
-        setcookie(res, name, req.sessionID, secrets[0], req.session.cookie.data);
+        res.cookie(name, req.sessionID, { ...req.session.cookie.data, signed: true });
       } catch (err) {
         setImmediate(next, err);
       }
@@ -545,18 +523,4 @@ function hash(sess) {
 
   // hash
   return crypto.createHash('sha1').update(str, 'utf8').digest('hex');
-}
-
-/**
- * Set cookie on response.
- *
- * @private
- */
-
-function setcookie(res, name, val, secret, options) {
-  const signed = 's:' + signature.sign(val, secret);
-  const data = cookie.serialize(name, signed, options);
-
-  debug('set-cookie %s', data);
-  res.appendHeader('Set-Cookie', data);
 }

@@ -10,7 +10,6 @@ const { cookie } = utils;
 const SmartStore = require('../support/smart-store');
 
 const session = require('../../');
-const Cookie = require('../../session/cookie');
 
 const {
   shouldSetSessionInStore,
@@ -491,7 +490,7 @@ describe('req.session', function () {
 
         server.on('error', function onerror(err) {
           assert.ok(err);
-          assert.strictEqual(err.message, 'option expires is invalid');
+          assert.match(err.message, /option expires is invalid/i);
           cb();
         });
 
@@ -500,8 +499,7 @@ describe('req.session', function () {
 
       it('should preserve cookies set before writeHead is called', function (_, done) {
         const server = createServer(null, function (req, res) {
-          const cookie = new Cookie();
-          res.setHeader('Set-Cookie', cookie.serialize('previous', 'cookieValue'));
+          res.setHeader('Set-Cookie', 'previous=cookieValue');
           res.end();
         });
 
@@ -513,9 +511,8 @@ describe('req.session', function () {
 
       it('should preserve cookies set in writeHead', function (_, done) {
         const server = createServer(null, function (req, res) {
-          const cookie = new Cookie();
           res.writeHead(200, {
-            'Set-Cookie': cookie.serialize('previous', 'cookieValue')
+            'Set-Cookie': 'previous=cookieValue'
           });
           res.end();
         });

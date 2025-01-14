@@ -515,10 +515,6 @@ describe('session options', function () {
   });
 
   describe('secret option', function () {
-    it('should reject empty arrays', function () {
-      assert.throws(createServer.bind(null, { secret: [] }), /secret option array/);
-    });
-
     it('should sign and unsign with a string', function (_, done) {
       const server = createServer({ secret: 'awesome cat' }, function (req, res) {
         if (!req.session.user) {

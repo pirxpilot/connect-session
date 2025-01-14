@@ -41,7 +41,7 @@ describe('session()', function () {
   });
 
   it('should error without secret', function (_, done) {
-    request(createServer({ secret: undefined }))
+    request(createServer({ secret: false }))
       .get('/')
       .expect(500, /secret.*required/, done);
   });
@@ -51,7 +51,7 @@ describe('session()', function () {
       req.secret = 'keyboard cat';
     }
 
-    request(createServer(setup, { secret: undefined }))
+    request(createServer(setup))
       .get('/')
       .expect(200, '', done);
   });

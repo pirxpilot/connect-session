@@ -1,5 +1,6 @@
 const http = require('node:http');
 const session = require('../../');
+const response = require('./response');
 
 const cookieParser = require('cookie-parser');
 
@@ -26,8 +27,11 @@ function createServer(options, respond) {
   return server.on('request', createRequestListener(opts, fn));
 }
 
-function createRequestListener(opts, fn) {
-  opts ??= {};
+function createRequestListener(options, fn) {
+  const {
+    secret = 'keyboard cat',
+    ...opts
+  } = options ?? {};
   const _session = createSession(opts);
   const respond = fn || end;
 
@@ -35,7 +39,10 @@ function createRequestListener(opts, fn) {
 
   function onRequest(req, res) {
     const server = this;
-    req.secret ??= opts.secret;
+    if (secret) {
+      req.secret ??= secret;
+    }
+    response(res);  // add cookie related methods to res
 
     const _cookieParser = cookieParser(req.secret);
     _cookieParser(req, res, function (err) {
@@ -65,15 +72,7 @@ function createRequestListener(opts, fn) {
 
 function createSession(opts) {
   const options = opts || {};
-
-  if (!('cookie' in options)) {
-    options.cookie = { maxAge: 60 * 1000 };
-  }
-
-  if (!('secret' in options)) {
-    options.secret = 'keyboard cat';
-  }
-
+  options.cookie ??= { maxAge: 60 * 1000 };
   return session(options);
 }
 
@@ -89,4 +88,3 @@ function mountAt(path) {
     }
   };
 }
-exports.mountAt = mountAt;

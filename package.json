@@ -13,8 +13,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "cookie": "~0",
-    "cookie-signature": "~1",
     "debug": "~4",
     "depd": "~2",
     "on-headers": "~1",
@@ -25,7 +23,9 @@
     "@pirxpilot/connect": "~4",
     "@pirxpilot/jshint": "~3",
     "after": "~0",
+    "cookie": "~1",
     "cookie-parser": "~1",
+    "cookie-signature": "~1",
     "supertest": "~7"
   },
   "files": [
