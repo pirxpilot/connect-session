@@ -205,7 +205,7 @@ function session(options) {
     req.sessionStore = store;
 
     // get the session ID from the cookie
-    const cookieId = (req.sessionID = getcookie(req, name, secrets));
+    const cookieId = (req.sessionID = getcookie(req, name));
 
     // set-cookie
     onHeaders(res, function () {
@@ -519,63 +519,9 @@ function generateSessionId() {
  * @private
  */
 
-function getcookie(req, name, secrets) {
-  const header = req.headers.cookie;
-  let raw;
-  let val;
-
-  // read from cookie header
-  if (header) {
-    const cookies = cookie.parse(header);
-
-    raw = cookies[name];
-
-    if (raw) {
-      if (raw.substr(0, 2) === 's:') {
-        val = unsigncookie(raw.slice(2), secrets);
-
-        if (val === false) {
-          debug('cookie signature invalid');
-          val = undefined;
-        }
-      } else {
-        debug('cookie unsigned');
-      }
-    }
-  }
-
-  // back-compat read from cookieParser() signedCookies data
-  if (!val && req.signedCookies) {
-    val = req.signedCookies[name];
-
-    if (val) {
-      deprecate('cookie should be available in req.headers.cookie');
-    }
-  }
-
-  // back-compat read from cookieParser() cookies data
-  if (!val && req.cookies) {
-    raw = req.cookies[name];
-
-    if (raw) {
-      if (raw.substr(0, 2) === 's:') {
-        val = unsigncookie(raw.slice(2), secrets);
-
-        if (val) {
-          deprecate('cookie should be available in req.headers.cookie');
-        }
-
-        if (val === false) {
-          debug('cookie signature invalid');
-          val = undefined;
-        }
-      } else {
-        debug('cookie unsigned');
-      }
-    }
-  }
-
-  return val;
+function getcookie(req, name) {
+  // read from cookieParser() signedCookies data
+  return req.signedCookies?.[name];
 }
 
 /**
@@ -613,24 +559,4 @@ function setcookie(res, name, val, secret, options) {
 
   debug('set-cookie %s', data);
   res.appendHeader('Set-Cookie', data);
-}
-
-/**
- * Verify and decode the given `val` with `secrets`.
- *
- * @param {String} val
- * @param {Array} secrets
- * @returns {String|Boolean}
- * @private
- */
-function unsigncookie(val, secrets) {
-  for (let i = 0; i < secrets.length; i++) {
-    const result = signature.unsign(val, secrets[i]);
-
-    if (result !== false) {
-      return result;
-    }
-  }
-
-  return false;
 }

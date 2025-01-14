@@ -1,6 +1,8 @@
 const http = require('node:http');
 const session = require('../../');
 
+const cookieParser = require('cookie-parser');
+
 module.exports = {
   createServer,
   createSession,
@@ -25,27 +27,40 @@ function createServer(options, respond) {
 }
 
 function createRequestListener(opts, fn) {
+  opts ??= {};
   const _session = createSession(opts);
   const respond = fn || end;
 
-  return function onRequest(req, res) {
-    const server = this;
+  return onRequest;
 
-    _session(req, res, function (err) {
-      if (err && !res._header) {
+  function onRequest(req, res) {
+    const server = this;
+    req.secret ??= opts.secret;
+
+    const _cookieParser = cookieParser(req.secret);
+    _cookieParser(req, res, function (err) {
+      if (err) {
         res.statusCode = err.status || 500;
         res.end(err.message);
         return;
       }
 
-      if (err) {
-        server.emit('error', err);
-        return;
-      }
+      _session(req, res, function (err) {
+        if (err && !res._header) {
+          res.statusCode = err.status || 500;
+          res.end(err.message);
+          return;
+        }
 
-      respond(req, res);
+        if (err) {
+          server.emit('error', err);
+          return;
+        }
+
+        respond(req, res);
+      });
     });
-  };
+  }
 }
 
 function createSession(opts) {

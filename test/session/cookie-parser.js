@@ -11,28 +11,6 @@ const {
 } = require('../support/server');
 
 describe('cookieParser()', function () {
-  it('should read from req.cookies', function (_, done) {
-    const app = connect()
-      .use(cookieParser())
-      .use(function (req, res, next) {
-        req.headers.cookie = 'foo=bar';
-        next();
-      })
-      .use(createSession())
-      .use(function (req, res, next) {
-        req.session.count = req.session.count || 0;
-        req.session.count++;
-        res.end(req.session.count.toString());
-      });
-
-    request(app)
-      .get('/')
-      .expect(200, '1', function (err, res) {
-        if (err) return done(err);
-        request(app).get('/').set('Cookie', cookie(res)).expect(200, '2', done);
-      });
-  });
-
   it('should reject unsigned from req.cookies', function (_, done) {
     const app = connect()
       .use(cookieParser())
@@ -41,7 +19,7 @@ describe('cookieParser()', function () {
         next();
       })
       .use(createSession({ key: 'sessid' }))
-      .use(function (req, res, next) {
+      .use(function (req, res) {
         req.session.count = req.session.count || 0;
         req.session.count++;
         res.end(req.session.count.toString());
@@ -81,25 +59,23 @@ describe('cookieParser()', function () {
       });
   });
 
-  it('should read from req.signedCookies', function (_, done) {
+  it('should read from req.signedCookies', async function () {
     const app = connect()
       .use(cookieParser('keyboard cat'))
-      .use(function (req, res, next) {
-        delete req.headers.cookie;
-        next();
-      })
       .use(createSession())
-      .use(function (req, res, next) {
-        req.session.count = req.session.count || 0;
+      .use(function (req, res) {
+        req.session.count ??= 0;
         req.session.count++;
         res.end(req.session.count.toString());
       });
 
-    request(app)
+    const res = await request(app)
       .get('/')
-      .expect(200, '1', function (err, res) {
-        if (err) return done(err);
-        request(app).get('/').set('Cookie', cookie(res)).expect(200, '2', done);
-      });
+      .expect(200, '1');
+
+    await request(app)
+      .get('/')
+      .set('Cookie', cookie(res))
+      .expect(200, '2');
   });
 });

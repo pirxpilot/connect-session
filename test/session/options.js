@@ -3,9 +3,6 @@ const assert = require('node:assert');
 const request = require('supertest');
 const after = require('after');
 
-const crypto = require('node:crypto');
-
-
 const utils = require('../support/utils');
 const { cookie } = utils;
 
@@ -524,25 +521,6 @@ describe('session options', function () {
 
     it('should sign and unsign with a string', function (_, done) {
       const server = createServer({ secret: 'awesome cat' }, function (req, res) {
-        if (!req.session.user) {
-          req.session.user = 'bob';
-          res.end('set');
-        } else {
-          res.end('get:' + JSON.stringify(req.session.user));
-        }
-      });
-
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'set', function (err, res) {
-          if (err) return done(err);
-          request(server).get('/').set('Cookie', cookie(res)).expect(200, 'get:"bob"', done);
-        });
-    });
-
-    it('should sign and unsign with a Buffer', function (_, done) {
-      const server = createServer({ secret: crypto.randomBytes(32) }, function (req, res) {
         if (!req.session.user) {
           req.session.user = 'bob';
           res.end('set');
