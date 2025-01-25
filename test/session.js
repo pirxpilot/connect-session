@@ -2,7 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
 const after = require('after');
-const http = require('http');
+const http = require('node:http');
 const request = require('supertest');
 const session = require('../');
 const SyncStore = require('./support/sync-store');
@@ -567,10 +567,7 @@ describe('session()', function () {
           request(createServer(null, respond))
             .get('/')
             .expect(function () {
-              assert.strictEqual(
-                error1 && error1.message,
-                error2 && error2.message
-              );
+              assert.strictEqual(error1?.message, error2?.message);
             })
             .expect(res.statusCode, res.text, done);
         });

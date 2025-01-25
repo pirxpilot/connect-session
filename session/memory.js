@@ -12,7 +12,7 @@
  */
 
 const Store = require('./store');
-const util = require('util');
+const util = require('node:util');
 
 /**
  * Module exports.

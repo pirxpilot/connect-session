@@ -207,7 +207,7 @@ describe('req.session', function () {
             });
           });
       });
-      var val;
+      let val;
 
       request(server)
         .get('/')
@@ -511,7 +511,7 @@ describe('req.session', function () {
       it('should forward errors setting cookie', function (_, done) {
         const cb = after(2, done);
         const server = createServer(
-          { cookie: { expires: new Date(NaN) } },
+          { cookie: { expires: new Date(Number.NaN) } },
           function (req, res) {
             res.end();
           }

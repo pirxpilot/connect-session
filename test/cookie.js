@@ -1,5 +1,5 @@
 const { describe, it } = require('node:test');
-const assert = require('assert');
+const assert = require('node:assert');
 const Cookie = require('../session/cookie');
 
 describe('new Cookie()', function () {

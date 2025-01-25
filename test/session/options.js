@@ -542,7 +542,6 @@ describe('session options', function () {
     });
 
     it('should prevent uninitialized session from being touched', function (_, done) {
-      const cb = after(1, done);
       const store = new session.MemoryStore();
       const server = createServer(
         { saveUninitialized: false, store, cookie: { maxAge: min } },
@@ -552,10 +551,10 @@ describe('session options', function () {
       );
 
       store.touch = function () {
-        cb(new Error('should not be called'));
+        assert.fail('should not call touch');
       };
 
-      request(server).get('/').expect(200, cb);
+      request(server).get('/').expect(200, done);
     });
   });
 
