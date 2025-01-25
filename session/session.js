@@ -5,8 +5,6 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Expose Session.
  */

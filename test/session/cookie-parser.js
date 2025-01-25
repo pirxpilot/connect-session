@@ -8,9 +8,7 @@ const connect = require('@pirxpilot/connect');
 
 const response = require('../support/response');
 
-const {
-  createSession
-} = require('../support/server');
+const { createSession } = require('../support/server');
 
 const { shouldSetCookie } = require('../support/should');
 
@@ -37,10 +35,7 @@ describe('cookieParser()', function () {
 
     const val = 'sessid=' + utils.sid(res);
 
-    await request(app)
-      .get('/')
-      .set('Cookie', val)
-      .expect(200, '1');
+    await request(app).get('/').set('Cookie', val).expect(200, '1');
   });
 
   it('should reject invalid signature from req.cookies', async function () {
@@ -65,10 +60,7 @@ describe('cookieParser()', function () {
 
     const val = cookie(res).replace(/...\./, '.');
 
-    await request(app)
-      .get('/')
-      .set('Cookie', val)
-      .expect(200, '1');
+    await request(app).get('/').set('Cookie', val).expect(200, '1');
   });
 
   it('should read from req.signedCookies', async function () {
@@ -85,13 +77,8 @@ describe('cookieParser()', function () {
         res.end(req.session.count.toString());
       });
 
-    const res = await request(app)
-      .get('/')
-      .expect(200, '1');
+    const res = await request(app).get('/').expect(200, '1');
 
-    await request(app)
-      .get('/')
-      .set('Cookie', cookie(res))
-      .expect(200, '2');
+    await request(app).get('/').set('Cookie', cookie(res)).expect(200, '2');
   });
 });

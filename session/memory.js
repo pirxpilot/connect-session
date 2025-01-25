@@ -6,8 +6,6 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Module dependencies.
  * @private
@@ -163,7 +161,9 @@ function getSession(sessionId) {
 
   if (sess.cookie) {
     const expires =
-      typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
+      typeof sess.cookie.expires === 'string'
+        ? new Date(sess.cookie.expires)
+        : sess.cookie.expires;
 
     // destroy expired session
     if (expires && expires <= Date.now()) {

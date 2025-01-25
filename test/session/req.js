@@ -23,10 +23,7 @@ const {
   shouldSetCookieWithoutAttribute
 } = require('../support/should');
 
-const {
-  createServer,
-  createRequestListener
-} = require('../support/server');
+const { createServer, createRequestListener } = require('../support/server');
 
 const min = 60 * 1000;
 
@@ -46,7 +43,10 @@ describe('req.session', function () {
         store.load(utils.sid(res), function (err, sess) {
           if (err) return done(err);
           assert.ok(sess);
-          request(server).get('/').set('Cookie', cookie(res)).expect(200, 'hits: 2', done);
+          request(server)
+            .get('/')
+            .set('Cookie', cookie(res))
+            .expect(200, 'hits: 2', done);
         });
       });
   });
@@ -214,7 +214,10 @@ describe('req.session', function () {
         .expect(200, 'session created', function (err, res) {
           if (err) return done(err);
           val = cookie(res);
-          request(server).get('/foo').set('Cookie', val).expect(200, 'saw /bar', done);
+          request(server)
+            .get('/foo')
+            .set('Cookie', val)
+            .expect(200, 'saw /bar', done);
         });
     });
 
@@ -249,42 +252,48 @@ describe('req.session', function () {
 
     it('should not override an overriden `reload` in case of errors', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, resave: false }, function (req, res) {
-        if (req.url === '/') {
-          req.session.active = true;
-          res.end('session created');
-          return;
-        }
-
-        store.clear(function (err) {
-          if (err) return done(err);
-
-          // reload way too many times on top of each other,
-          // attempting to overflow the call stack
-          let iters = 20;
-          reload();
-
-          function reload() {
-            if (!--iters) {
-              res.end('ok');
-              return;
-            }
-
-            try {
-              req.session.reload(reload);
-            } catch (e) {
-              res.statusCode = 500;
-              res.end(e.message);
-            }
+      const server = createServer(
+        { store, resave: false },
+        function (req, res) {
+          if (req.url === '/') {
+            req.session.active = true;
+            res.end('session created');
+            return;
           }
-        });
-      });
+
+          store.clear(function (err) {
+            if (err) return done(err);
+
+            // reload way too many times on top of each other,
+            // attempting to overflow the call stack
+            let iters = 20;
+            reload();
+
+            function reload() {
+              if (!--iters) {
+                res.end('ok');
+                return;
+              }
+
+              try {
+                req.session.reload(reload);
+              } catch (e) {
+                res.statusCode = 500;
+                res.end(e.message);
+              }
+            }
+          });
+        }
+      );
 
       request(server)
         .get('/')
         .expect(200, 'session created', function (err, res) {
           if (err) return done(err);
-          request(server).get('/foo').set('Cookie', cookie(res)).expect(200, 'ok', done);
+          request(server)
+            .get('/foo')
+            .set('Cookie', cookie(res))
+            .expect(200, 'ok', done);
         });
     });
   });
@@ -357,7 +366,8 @@ describe('req.session', function () {
     describe('when saveUninitialized is false', function () {
       it('should prevent end-of-request save', function (_, done) {
         const store = new session.MemoryStore();
-        const server = createServer({ saveUninitialized: false, store },
+        const server = createServer(
+          { saveUninitialized: false, store },
           function (req, res) {
             req.session.hit = true;
             req.session.save(function (err) {
@@ -385,7 +395,8 @@ describe('req.session', function () {
   describe('.touch()', function () {
     it('should reset session expiration', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ resave: false, store, cookie: { maxAge: min } },
+      const server = createServer(
+        { resave: false, store, cookie: { maxAge: min } },
         function (req, res) {
           req.session.hit = true;
           req.session.touch();
@@ -409,7 +420,10 @@ describe('req.session', function () {
                   if (err) return done(err);
                   store.get(id, function (err, sess) {
                     if (err) return done(err);
-                    assert.notStrictEqual(new Date(sess.cookie.expires).getTime(), exp.getTime());
+                    assert.notStrictEqual(
+                      new Date(sess.cookie.expires).getTime(),
+                      exp.getTime()
+                    );
                     done();
                   });
                 });
@@ -476,17 +490,32 @@ describe('req.session', function () {
           .get('/admin')
           .expect(shouldSetCookieWithAttribute('connect.sid', 'Expires'))
           .expect(shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly'))
-          .expect(shouldSetCookieWithAttributeAndValue('connect.sid', 'Path', '/admin'))
+          .expect(
+            shouldSetCookieWithAttributeAndValue(
+              'connect.sid',
+              'Path',
+              '/admin'
+            )
+          )
           .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
-          .expect(shouldSetCookieWithAttributeAndValue('connect.sid', 'Priority', 'High'))
+          .expect(
+            shouldSetCookieWithAttributeAndValue(
+              'connect.sid',
+              'Priority',
+              'High'
+            )
+          )
           .expect(200, done);
       });
 
       it('should forward errors setting cookie', function (_, done) {
         const cb = after(2, done);
-        const server = createServer({ cookie: { expires: new Date(NaN) } }, function (req, res) {
-          res.end();
-        });
+        const server = createServer(
+          { cookie: { expires: new Date(NaN) } },
+          function (req, res) {
+            res.end();
+          }
+        );
 
         server.on('error', function onerror(err) {
           assert.ok(err);
@@ -526,9 +555,12 @@ describe('req.session', function () {
 
     describe('.originalMaxAge', function () {
       it('should equal original maxAge', function (_, done) {
-        const server = createServer({ cookie: { maxAge: 2000 } }, function (req, res) {
-          res.end(JSON.stringify(req.session.cookie.originalMaxAge));
-        });
+        const server = createServer(
+          { cookie: { maxAge: 2000 } },
+          function (req, res) {
+            res.end(JSON.stringify(req.session.cookie.originalMaxAge));
+          }
+        );
 
         request(server)
           .get('/')
@@ -544,9 +576,12 @@ describe('req.session', function () {
       });
 
       it('should equal original maxAge for all requests', function (_, done) {
-        const server = createServer({ cookie: { maxAge: 2000 } }, function (req, res) {
-          res.end(JSON.stringify(req.session.cookie.originalMaxAge));
-        });
+        const server = createServer(
+          { cookie: { maxAge: 2000 } },
+          function (req, res) {
+            res.end(JSON.stringify(req.session.cookie.originalMaxAge));
+          }
+        );
 
         request(server)
           .get('/')
@@ -579,7 +614,8 @@ describe('req.session', function () {
 
       it('should equal original maxAge for all requests', function (_, done) {
         const store = new SmartStore();
-        const server = createServer({ cookie: { maxAge: 2000 }, store },
+        const server = createServer(
+          { cookie: { maxAge: 2000 }, store },
           function (req, res) {
             res.end(JSON.stringify(req.session.cookie.originalMaxAge));
           }
@@ -619,13 +655,19 @@ describe('req.session', function () {
       let app;
 
       before(function () {
-        app = createRequestListener({ secret: 'keyboard cat', cookie: { secure: true } });
+        app = createRequestListener({
+          secret: 'keyboard cat',
+          cookie: { secure: true }
+        });
       });
 
       it('should not set-cookie when insecure', function (_, done) {
         const server = http.createServer(app);
 
-        request(server).get('/').expect(shouldNotHaveHeader('Set-Cookie')).expect(200, done);
+        request(server)
+          .get('/')
+          .expect(shouldNotHaveHeader('Set-Cookie'))
+          .expect(200, done);
       });
     });
 
@@ -633,24 +675,26 @@ describe('req.session', function () {
       const ctx = {};
 
       before(function (_, done) {
-
         ctx.cookie = '';
-        ctx.server = createServer({ cookie: { maxAge: 2000 } }, function (req, res) {
-          switch (++req.session.count) {
-            case 1:
-              break;
-            case 2:
-              req.session.cookie.maxAge = 5000;
-              break;
-            case 3:
-              req.session.cookie.maxAge = 3000000000;
-              break;
-            default:
-              req.session.count = 0;
-              break;
+        ctx.server = createServer(
+          { cookie: { maxAge: 2000 } },
+          function (req, res) {
+            switch (++req.session.count) {
+              case 1:
+                break;
+              case 2:
+                req.session.cookie.maxAge = 5000;
+                break;
+              case 3:
+                req.session.cookie.maxAge = 3000000000;
+                break;
+              default:
+                req.session.count = 0;
+                break;
+            }
+            res.end(req.session.count.toString());
           }
-          res.end(req.session.count.toString());
-        });
+        );
 
         request(ctx.server)
           .get('/')
@@ -767,7 +811,9 @@ describe('req.session', function () {
 
           request(server)
             .get('/')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned'))
+            .expect(
+              shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')
+            )
             .expect(200, done);
         });
       });
@@ -778,7 +824,9 @@ describe('req.session', function () {
 
           request(server)
             .get('/')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned'))
+            .expect(
+              shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')
+            )
             .expect(200, done);
         });
       });

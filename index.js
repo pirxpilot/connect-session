@@ -6,8 +6,6 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Module dependencies.
  * @private
@@ -105,7 +103,9 @@ function session(options) {
   }
 
   if (saveUninitializedSession === undefined) {
-    deprecate('undefined saveUninitialized option; provide saveUninitialized option');
+    deprecate(
+      'undefined saveUninitialized option; provide saveUninitialized option'
+    );
     saveUninitializedSession = true;
   }
 
@@ -210,7 +210,10 @@ function session(options) {
 
       // set cookie
       try {
-        res.cookie(name, req.sessionID, { ...req.session.cookie.data, signed: true });
+        res.cookie(name, req.sessionID, {
+          ...req.session.cookie.data,
+          signed: true
+        });
       } catch (err) {
         setImmediate(next, err);
       }
@@ -258,7 +261,9 @@ function session(options) {
 
         if (!isNaN(contentLength) && contentLength > 0) {
           // measure chunk
-          chunk = !Buffer.isBuffer(chunk) ? Buffer.from(chunk, encoding) : chunk;
+          chunk = !Buffer.isBuffer(chunk)
+            ? Buffer.from(chunk, encoding)
+            : chunk;
           encoding = undefined;
 
           if (chunk.length !== 0) {
@@ -411,20 +416,28 @@ function session(options) {
     function shouldSave(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
+        debug(
+          'session ignored because of bogus req.sessionID %o',
+          req.sessionID
+        );
         return false;
       }
 
-      return !saveUninitializedSession && !savedHash && cookieId !== req.sessionID ?
-        isModified(req.session) :
-        !isSaved(req.session);
+      return !saveUninitializedSession &&
+        !savedHash &&
+        cookieId !== req.sessionID
+        ? isModified(req.session)
+        : !isSaved(req.session);
     }
 
     // determine if session should be touched
     function shouldTouch(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
+        debug(
+          'session ignored because of bogus req.sessionID %o',
+          req.sessionID
+        );
         return false;
       }
 
@@ -438,9 +451,10 @@ function session(options) {
         return false;
       }
 
-      return cookieId !== req.sessionID ?
-        saveUninitializedSession || isModified(req.session) :
-        rollingSessions || (req.session.cookie.expires != null && isModified(req.session));
+      return cookieId !== req.sessionID
+        ? saveUninitializedSession || isModified(req.session)
+        : rollingSessions ||
+            (req.session.cookie.expires != null && isModified(req.session));
     }
 
     // generate a session if the browser doesn't send a sessionID
