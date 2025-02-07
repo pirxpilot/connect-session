@@ -6,8 +6,6 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Module dependencies.
  * @private
@@ -34,16 +32,16 @@ const env = process.env.NODE_ENV;
  * Expose the middleware.
  */
 
-exports = module.exports = session;
+module.exports = session;
 
 /**
  * Expose constructors.
  */
 
-exports.Store = Store;
-exports.Cookie = Cookie;
-exports.Session = Session;
-exports.MemoryStore = MemoryStore;
+session.Store = Store;
+session.Cookie = Cookie;
+session.Session = Session;
+session.MemoryStore = MemoryStore;
 
 /**
  * Warning message for `MemoryStore` usage in production.
@@ -105,7 +103,9 @@ function session(options) {
   }
 
   if (saveUninitializedSession === undefined) {
-    deprecate('undefined saveUninitialized option; provide saveUninitialized option');
+    deprecate(
+      'undefined saveUninitialized option; provide saveUninitialized option'
+    );
     saveUninitializedSession = true;
   }
 
@@ -210,7 +210,10 @@ function session(options) {
 
       // set cookie
       try {
-        res.cookie(name, req.sessionID, { ...req.session.cookie.data, signed: true });
+        res.cookie(name, req.sessionID, {
+          ...req.session.cookie.data,
+          signed: true
+        });
       } catch (err) {
         setImmediate(next, err);
       }
@@ -256,9 +259,11 @@ function session(options) {
 
         const contentLength = Number(res.getHeader('Content-Length'));
 
-        if (!isNaN(contentLength) && contentLength > 0) {
+        if (!Number.isNaN(contentLength) && contentLength > 0) {
           // measure chunk
-          chunk = !Buffer.isBuffer(chunk) ? Buffer.from(chunk, encoding) : chunk;
+          chunk = !Buffer.isBuffer(chunk)
+            ? Buffer.from(chunk, encoding)
+            : chunk;
           encoding = undefined;
 
           if (chunk.length !== 0) {
@@ -312,7 +317,8 @@ function session(options) {
         });
 
         return writetop();
-      } else if (storeImplementsTouch && shouldTouch(req)) {
+      }
+      if (storeImplementsTouch && shouldTouch(req)) {
         // store implements touch method
         debug('touching');
         store.touch(req.sessionID, req.session, function ontouch(err) {
@@ -371,10 +377,10 @@ function session(options) {
         _reload.call(this, rewrapmethods(this, callback));
       }
 
-      function save() {
+      function save(...args) {
         debug('saving %s', this.id);
         savedHash = hash(this);
-        _save.apply(this, arguments);
+        _save.apply(this, args);
       }
 
       Object.defineProperty(sess, 'reload', {
@@ -411,20 +417,28 @@ function session(options) {
     function shouldSave(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
+        debug(
+          'session ignored because of bogus req.sessionID %o',
+          req.sessionID
+        );
         return false;
       }
 
-      return !saveUninitializedSession && !savedHash && cookieId !== req.sessionID ?
-        isModified(req.session) :
-        !isSaved(req.session);
+      return !saveUninitializedSession &&
+        !savedHash &&
+        cookieId !== req.sessionID
+        ? isModified(req.session)
+        : !isSaved(req.session);
     }
 
     // determine if session should be touched
     function shouldTouch(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
+        debug(
+          'session ignored because of bogus req.sessionID %o',
+          req.sessionID
+        );
         return false;
       }
 
@@ -438,9 +452,10 @@ function session(options) {
         return false;
       }
 
-      return cookieId !== req.sessionID ?
-        saveUninitializedSession || isModified(req.session) :
-        rollingSessions || (req.session.cookie.expires != null && isModified(req.session));
+      return cookieId !== req.sessionID
+        ? saveUninitializedSession || isModified(req.session)
+        : rollingSessions ||
+            (req.session.cookie.expires != null && isModified(req.session));
     }
 
     // generate a session if the browser doesn't send a sessionID

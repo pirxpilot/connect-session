@@ -2,7 +2,6 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const request = require('supertest');
 
-
 const utils = require('../support/utils');
 const { cookie } = utils;
 
@@ -13,9 +12,7 @@ const {
   shouldSetCookieToDifferentSessionId
 } = require('../support/should');
 
-const {
-  createServer,
-} = require('../support/server');
+const { createServer } = require('../support/server');
 
 describe('when sid not in store', function () {
   it('should create a new session', function (_, done) {
@@ -33,7 +30,10 @@ describe('when sid not in store', function () {
         if (err) return done(err);
         store.clear(function (err) {
           if (err) return done(err);
-          request(server).get('/').set('Cookie', cookie(res)).expect(200, 'session 2', done);
+          request(server)
+            .get('/')
+            .set('Cookie', cookie(res))
+            .expect(200, 'session 2', done);
         });
       });
   });

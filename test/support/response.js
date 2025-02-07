@@ -27,7 +27,7 @@ function cookie(name, value, options = {}) {
 
   opts.path ??= '/';
   if (maxAge != null) {
-    if (!isNaN(maxAge)) {
+    if (!Number.isNaN(maxAge)) {
       opts.expires = new Date(Date.now() + maxAge);
       opts.maxAge = Math.floor(maxAge / 1000);
     }

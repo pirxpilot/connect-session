@@ -1,4 +1,4 @@
-const assert = require('assert');
+const assert = require('node:assert');
 const utils = require('./utils');
 
 module.exports = {
@@ -11,28 +11,21 @@ module.exports = {
   shouldSetCookieToValue,
   shouldSetCookieWithAttribute,
   shouldSetCookieWithAttributeAndValue,
-  shouldSetCookieWithoutAttribute,
+  shouldSetCookieWithoutAttribute
 };
 
 function shouldSetSessionInStore(store, delay) {
   const _set = store.set;
   let count = 0;
 
-  store.set = function set() {
+  store.set = function set(...args) {
     count++;
 
     if (!delay) {
-      return _set.apply(this, arguments);
+      return _set.apply(this, args);
     }
 
-    const args = new Array(arguments.length + 1);
-
-    args[0] = this;
-    for (let i = 1; i < args.length; i++) {
-      args[i] = arguments[i - 1];
-    }
-
-    setTimeout(_set.bind.apply(_set, args), delay);
+    setTimeout(() => _set.apply(this, args), delay);
   };
 
   return function () {
@@ -40,21 +33,22 @@ function shouldSetSessionInStore(store, delay) {
   };
 }
 
-
 function shouldNotHaveHeader(header) {
   return function (res) {
-    assert.ok(!(header.toLowerCase() in res.headers), 'should not have ' + header + ' header');
+    assert.ok(
+      !(header.toLowerCase() in res.headers),
+      'should not have ' + header + ' header'
+    );
   };
 }
-
 
 function shouldNotSetSessionInStore(store) {
   const _set = store.set;
   let count = 0;
 
-  store.set = function set() {
+  store.set = function set(...args) {
     count++;
-    return _set.apply(this, arguments);
+    return _set.apply(this, args);
   };
 
   return function () {
@@ -99,7 +93,11 @@ function shouldSetCookieToValue(name, val) {
     const data = header && utils.parseSetCookie(header);
     assert.ok(header, 'should have a cookie header');
     assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.strictEqual(data.value, val, 'should set cookie ' + name + ' to ' + val);
+    assert.strictEqual(
+      data.value,
+      val,
+      'should set cookie ' + name + ' to ' + val
+    );
   };
 }
 
@@ -109,7 +107,10 @@ function shouldSetCookieWithAttribute(name, attrib) {
     const data = header && utils.parseSetCookie(header);
     assert.ok(header, 'should have a cookie header');
     assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(attrib.toLowerCase() in data, 'should set cookie with attribute ' + attrib);
+    assert.ok(
+      attrib.toLowerCase() in data,
+      'should set cookie with attribute ' + attrib
+    );
   };
 }
 
@@ -119,7 +120,10 @@ function shouldSetCookieWithAttributeAndValue(name, attrib, value) {
     const data = header && utils.parseSetCookie(header);
     assert.ok(header, 'should have a cookie header');
     assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(attrib.toLowerCase() in data, 'should set cookie with attribute ' + attrib);
+    assert.ok(
+      attrib.toLowerCase() in data,
+      'should set cookie with attribute ' + attrib
+    );
     assert.strictEqual(
       data[attrib.toLowerCase()],
       value,
@@ -134,6 +138,9 @@ function shouldSetCookieWithoutAttribute(name, attrib) {
     const data = header && utils.parseSetCookie(header);
     assert.ok(header, 'should have a cookie header');
     assert.strictEqual(data.name, name, 'should set cookie ' + name);
-    assert.ok(!(attrib.toLowerCase() in data), 'should set cookie without attribute ' + attrib);
+    assert.ok(
+      !(attrib.toLowerCase() in data),
+      'should set cookie without attribute ' + attrib
+    );
   };
 }

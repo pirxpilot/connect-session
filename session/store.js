@@ -5,17 +5,15 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Module dependencies.
  * @private
  */
 
 const Cookie = require('./cookie');
-const EventEmitter = require('events').EventEmitter;
+const EventEmitter = require('node:events').EventEmitter;
 const Session = require('./session');
-const util = require('util');
+const util = require('node:util');
 
 /**
  * Module exports.

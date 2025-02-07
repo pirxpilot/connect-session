@@ -28,10 +28,7 @@ function createServer(options, respond) {
 }
 
 function createRequestListener(options, fn) {
-  const {
-    secret = 'keyboard cat',
-    ...opts
-  } = options ?? {};
+  const { secret = 'keyboard cat', ...opts } = options ?? {};
   const _session = createSession(opts);
   const respond = fn || end;
 
@@ -42,7 +39,7 @@ function createRequestListener(options, fn) {
     if (secret) {
       req.secret ??= secret;
     }
-    response(res);  // add cookie related methods to res
+    response(res); // add cookie related methods to res
 
     const _cookieParser = cookieParser(req.secret);
     _cookieParser(req, res, function (err) {

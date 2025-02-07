@@ -1,7 +1,5 @@
-'use strict';
-
 const session = require('../../');
-const util = require('util');
+const util = require('node:util');
 
 module.exports = SyncStore;
 

@@ -2,7 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
 const after = require('after');
-const http = require('http');
+const http = require('node:http');
 const request = require('supertest');
 const session = require('../');
 const SyncStore = require('./support/sync-store');
@@ -13,12 +13,10 @@ const {
   shouldSetSessionInStore,
   shouldNotHaveHeader,
   shouldSetCookie,
-  shouldSetCookieToDifferentSessionId,
+  shouldSetCookieToDifferentSessionId
 } = require('./support/should');
 
-const {
-  createServer
-} = require('./support/server');
+const { createServer } = require('./support/server');
 
 const min = 60 * 1000;
 
@@ -51,9 +49,7 @@ describe('session()', function () {
       req.secret = 'keyboard cat';
     }
 
-    request(createServer(setup))
-      .get('/')
-      .expect(200, '', done);
+    request(createServer(setup)).get('/').expect(200, '', done);
   });
 
   it('should create a new session', function (_, done) {
@@ -88,7 +84,10 @@ describe('session()', function () {
       .expect(shouldSetCookie('connect.sid'))
       .expect(200, 'session 1', function (err, res) {
         if (err) return done(err);
-        request(server).get('/').set('Cookie', cookie(res)).expect(200, 'session 1', done);
+        request(server)
+          .get('/')
+          .set('Cookie', cookie(res))
+          .expect(200, 'session 1', done);
       });
   });
 
@@ -107,7 +106,10 @@ describe('session()', function () {
       .expect(shouldSetCookie('connect.sid'))
       .expect(200, 'hello, world', function (err, res) {
         if (err) return done(err);
-        request(server).get('/').set('Cookie', cookie(res)).expect(500, 'boom!', done);
+        request(server)
+          .get('/')
+          .set('Cookie', cookie(res))
+          .expect(500, 'boom!', done);
       });
   });
 
@@ -130,7 +132,10 @@ describe('session()', function () {
       .expect(shouldSetCookie('connect.sid'))
       .expect(200, 'session 1', function (err, res) {
         if (err) return done(err);
-        request(server).get('/').set('Cookie', cookie(res)).expect(200, 'session 2', done);
+        request(server)
+          .get('/')
+          .set('Cookie', cookie(res))
+          .expect(200, 'session 2', done);
       });
   });
 
@@ -163,7 +168,10 @@ describe('session()', function () {
       req.url = '';
     }
 
-    request(createServer(setup)).get('/').expect(shouldSetCookie('connect.sid')).expect(200, done);
+    request(createServer(setup))
+      .get('/')
+      .expect(shouldSetCookie('connect.sid'))
+      .expect(200, done);
   });
 
   it('should handle multiple res.end calls', function (_, done) {
@@ -207,7 +215,10 @@ describe('session()', function () {
           sess.save = 'nope';
           store.set(sid, sess, function (err) {
             if (err) return done(err);
-            request(server).get('/').set('Cookie', cookie(res)).expect(200, 'session saved', done);
+            request(server)
+              .get('/')
+              .set('Cookie', cookie(res))
+              .expect(200, 'session saved', done);
           });
         });
       });
@@ -226,7 +237,7 @@ describe('session()', function () {
   it('should not save with bogus req.sessionID', function (_, done) {
     const store = new session.MemoryStore();
     const server = createServer({ store }, function (req, res) {
-      req.sessionID = function () { };
+      req.sessionID = function () {};
       req.session.test1 = 1;
       req.session.test2 = 'b';
       res.end();
@@ -300,7 +311,11 @@ describe('session()', function () {
         res.end();
       });
 
-      request(server).get('/').expect(200).expect(shouldSetSessionInStore(store, 200)).end(done);
+      request(server)
+        .get('/')
+        .expect(200)
+        .expect(shouldSetSessionInStore(store, 200))
+        .end(done);
     });
 
     it('should have saved session even with multi-write', function (_, done) {
@@ -338,10 +353,13 @@ describe('session()', function () {
 
     it('should have saved session with updated cookie expiration', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ cookie: { maxAge: min }, store }, function (req, res) {
-        req.session.user = 'bob';
-        res.end(req.session.id);
-      });
+      const server = createServer(
+        { cookie: { maxAge: min }, store },
+        function (req, res) {
+          req.session.user = 'bob';
+          res.end(req.session.id);
+        }
+      );
 
       request(server)
         .get('/')
@@ -385,10 +403,13 @@ describe('session()', function () {
     it('should create a new session', function (_, done) {
       let count = 0;
       const store = new session.MemoryStore();
-      const server = createServer({ store, cookie: { maxAge: 5 } }, function (req, res) {
-        req.session.num = req.session.num || ++count;
-        res.end('session ' + req.session.num);
-      });
+      const server = createServer(
+        { store, cookie: { maxAge: 5 } },
+        function (req, res) {
+          req.session.num = req.session.num || ++count;
+          res.end('session ' + req.session.num);
+        }
+      );
 
       request(server)
         .get('/')
@@ -408,10 +429,13 @@ describe('session()', function () {
     it('should have a new sid', function (_, done) {
       let count = 0;
       const store = new session.MemoryStore();
-      const server = createServer({ store, cookie: { maxAge: 5 } }, function (req, res) {
-        req.session.num = req.session.num || ++count;
-        res.end('session ' + req.session.num);
-      });
+      const server = createServer(
+        { store, cookie: { maxAge: 5 } },
+        function (req, res) {
+          req.session.num = req.session.num || ++count;
+          res.end('session ' + req.session.num);
+        }
+      );
 
       request(server)
         .get('/')
@@ -432,10 +456,13 @@ describe('session()', function () {
     it('should not exist in store', function (_, done) {
       let count = 0;
       const store = new session.MemoryStore();
-      const server = createServer({ store, cookie: { maxAge: 5 } }, function (req, res) {
-        req.session.num = req.session.num || ++count;
-        res.end('session ' + req.session.num);
-      });
+      const server = createServer(
+        { store, cookie: { maxAge: 5 } },
+        function (req, res) {
+          req.session.num = req.session.num || ++count;
+          res.end('session ' + req.session.num);
+        }
+      );
 
       request(server)
         .get('/')
@@ -503,7 +530,9 @@ describe('session()', function () {
         res.end('world');
       }
 
-      request(createServer(null, respond)).get('/').expect(200, 'hello, world', done);
+      request(createServer(null, respond))
+        .get('/')
+        .expect(200, 'hello, world', done);
     });
 
     it('should error when res.end is called twice', function (_, done) {
@@ -538,7 +567,7 @@ describe('session()', function () {
           request(createServer(null, respond))
             .get('/')
             .expect(function () {
-              assert.strictEqual(error1 && error1.message, error2 && error2.message);
+              assert.strictEqual(error1?.message, error2?.message);
             })
             .expect(res.statusCode, res.text, done);
         });
@@ -559,15 +588,18 @@ describe('session()', function () {
 
     it('should respond correctly on destroy', function (_, done) {
       const store = new SyncStore();
-      const server = createServer({ store, unset: 'destroy' }, function (req, res) {
-        req.session.count = req.session.count || 0;
-        const count = ++req.session.count;
-        if (req.session.count > 1) {
-          req.session = null;
-          res.write('destroyed\n');
+      const server = createServer(
+        { store, unset: 'destroy' },
+        function (req, res) {
+          req.session.count = req.session.count || 0;
+          const count = ++req.session.count;
+          if (req.session.count > 1) {
+            req.session = null;
+            res.write('destroyed\n');
+          }
+          res.end('hits: ' + count);
         }
-        res.end('hits: ' + count);
-      });
+      );
 
       request(server)
         .get('/')
@@ -580,5 +612,4 @@ describe('session()', function () {
         });
     });
   });
-
 });

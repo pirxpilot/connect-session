@@ -5,8 +5,6 @@
  * MIT Licensed
  */
 
-'use strict';
-
 /**
  * Module dependencies.
  */
@@ -98,7 +96,9 @@ Cookie.prototype = {
    */
 
   get maxAge() {
-    return this.expires instanceof Date ? this.expires.valueOf() - Date.now() : this.expires;
+    return this.expires instanceof Date
+      ? this.expires.valueOf() - Date.now()
+      : this.expires;
   },
 
   /**

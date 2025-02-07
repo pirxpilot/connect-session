@@ -18,15 +18,11 @@ const {
   shouldSetCookieWithoutAttribute
 } = require('../support/should');
 
-const {
-  createServer,
-  mountAt
-} = require('../support/server');
+const { createServer, mountAt } = require('../support/server');
 
 const min = 60 * 1000;
 
 describe('session options', function () {
-
   describe('cookie option', function () {
     describe('when "path" set to "/foo/bar"', function () {
       const ctx = {};
@@ -36,7 +32,10 @@ describe('session options', function () {
       });
 
       it('should not set cookie for "/" request', function (_, done) {
-        request(ctx.server).get('/').expect(shouldNotHaveHeader('Set-Cookie')).expect(200, done);
+        request(ctx.server)
+          .get('/')
+          .expect(shouldNotHaveHeader('Set-Cookie'))
+          .expect(200, done);
       });
 
       it('should not set cookie for "http://foo/bar" request', function (_, done) {
@@ -63,7 +62,9 @@ describe('session options', function () {
 
       describe('when mounted at "/foo"', function () {
         before(function () {
-          ctx.server = createServer(mountAt('/foo'), { cookie: { path: '/foo/bar' } });
+          ctx.server = createServer(mountAt('/foo'), {
+            cookie: { path: '/foo/bar' }
+          });
         });
 
         it('should set cookie for "/foo/bar" request', function (_, done) {
@@ -94,7 +95,11 @@ describe('session options', function () {
           res.end(String(req.secure));
         }
 
-        ctx.server = createServer(setup, { cookie: { secure: 'auto' } }, respond);
+        ctx.server = createServer(
+          setup,
+          { cookie: { secure: 'auto' } },
+          respond
+        );
       });
 
       it('should set secure if req.secure = true', function (_, done) {
@@ -121,7 +126,10 @@ describe('session options', function () {
     });
 
     it('should provide default generator', function (_, done) {
-      request(createServer()).get('/').expect(shouldSetCookie('connect.sid')).expect(200, done);
+      request(createServer())
+        .get('/')
+        .expect(shouldSetCookie('connect.sid'))
+        .expect(200, done);
     });
 
     it('should allow custom function', function (_, done) {
@@ -175,7 +183,10 @@ describe('session options', function () {
 
   describe('key option', function () {
     it('should default to "connect.sid"', function (_, done) {
-      request(createServer()).get('/').expect(shouldSetCookie('connect.sid')).expect(200, done);
+      request(createServer())
+        .get('/')
+        .expect(shouldSetCookie('connect.sid'))
+        .expect(200, done);
     });
 
     it('should allow overriding', function (_, done) {
@@ -188,7 +199,10 @@ describe('session options', function () {
 
   describe('name option', function () {
     it('should default to "connect.sid"', function (_, done) {
-      request(createServer()).get('/').expect(shouldSetCookie('connect.sid')).expect(200, done);
+      request(createServer())
+        .get('/')
+        .expect(shouldSetCookie('connect.sid'))
+        .expect(200, done);
     });
 
     it('should set the cookie name', function (_, done) {
@@ -240,7 +254,11 @@ describe('session options', function () {
 
     it('should not force cookie on uninitialized session if saveUninitialized option is set to false', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, rolling: true, saveUninitialized: false });
+      const server = createServer({
+        store,
+        rolling: true,
+        saveUninitialized: false
+      });
 
       request(server)
         .get('/')
@@ -251,7 +269,11 @@ describe('session options', function () {
 
     it('should force cookie and save uninitialized session if saveUninitialized option is set to true', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, rolling: true, saveUninitialized: true });
+      const server = createServer({
+        store,
+        rolling: true,
+        saveUninitialized: true
+      });
 
       request(server)
         .get('/')
@@ -262,7 +284,8 @@ describe('session options', function () {
 
     it('should force cookie and save modified session even if saveUninitialized option is set to false', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, rolling: true, saveUninitialized: false },
+      const server = createServer(
+        { store, rolling: true, saveUninitialized: false },
         function (req, res) {
           req.session.user = 'bob';
           res.end();
@@ -301,10 +324,13 @@ describe('session options', function () {
     describe('when true', function () {
       it('should force save on unmodified session', function (_, done) {
         const store = new session.MemoryStore();
-        const server = createServer({ store, resave: true }, function (req, res) {
-          req.session.user = 'bob';
-          res.end();
-        });
+        const server = createServer(
+          { store, resave: true },
+          function (req, res) {
+            req.session.user = 'bob';
+            res.end();
+          }
+        );
 
         request(server)
           .get('/')
@@ -323,10 +349,13 @@ describe('session options', function () {
     describe('when false', function () {
       it('should prevent save on unmodified session', function (_, done) {
         const store = new session.MemoryStore();
-        const server = createServer({ store, resave: false }, function (req, res) {
-          req.session.user = 'bob';
-          res.end();
-        });
+        const server = createServer(
+          { store, resave: false },
+          function (req, res) {
+            req.session.user = 'bob';
+            res.end();
+          }
+        );
 
         request(server)
           .get('/')
@@ -343,12 +372,15 @@ describe('session options', function () {
 
       it('should still save modified session', function (_, done) {
         const store = new session.MemoryStore();
-        const server = createServer({ resave: false, store }, function (req, res) {
-          if (req.method === 'PUT') {
-            req.session.token = req.url.substr(1);
+        const server = createServer(
+          { resave: false, store },
+          function (req, res) {
+            if (req.method === 'PUT') {
+              req.session.token = req.url.substr(1);
+            }
+            res.end('token=' + (req.session.token || ''));
           }
-          res.end('token=' + (req.session.token || ''));
-        });
+        );
 
         request(server)
           .put('/w6RHhwaA')
@@ -379,13 +411,16 @@ describe('session options', function () {
 
       it('should detect a "cookie" property as modified', function (_, done) {
         const store = new session.MemoryStore();
-        const server = createServer({ store, resave: false }, function (req, res) {
-          req.session.user = req.session.user || {};
-          req.session.user.name = 'bob';
-          req.session.user.cookie = req.session.user.cookie || 0;
-          req.session.user.cookie++;
-          res.end();
-        });
+        const server = createServer(
+          { store, resave: false },
+          function (req, res) {
+            req.session.user = req.session.user || {};
+            req.session.user.name = 'bob';
+            req.session.user.cookie = req.session.user.cookie || 0;
+            req.session.user.cookie++;
+            res.end();
+          }
+        );
 
         request(server)
           .get('/')
@@ -403,10 +438,13 @@ describe('session options', function () {
       it('should pass session touch error', function (_, done) {
         const cb = after(2, done);
         const store = new session.MemoryStore();
-        const server = createServer({ store, resave: false }, function (req, res) {
-          req.session.hit = true;
-          res.end('session saved');
-        });
+        const server = createServer(
+          { store, resave: false },
+          function (req, res) {
+            req.session.hit = true;
+            res.end('session saved');
+          }
+        );
 
         store.touch = function touch(sid, sess, callback) {
           callback(new Error('boom!'));
@@ -464,11 +502,14 @@ describe('session options', function () {
 
     it('should still save modified session', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, saveUninitialized: false }, function (req, res) {
-        req.session.count = req.session.count || 0;
-        req.session.count++;
-        res.end();
-      });
+      const server = createServer(
+        { store, saveUninitialized: false },
+        function (req, res) {
+          req.session.count = req.session.count || 0;
+          req.session.count++;
+          res.end();
+        }
+      );
 
       request(server)
         .get('/')
@@ -480,9 +521,12 @@ describe('session options', function () {
     it('should pass session save error', function (_, done) {
       const cb = after(2, done);
       const store = new session.MemoryStore();
-      const server = createServer({ store, saveUninitialized: true }, function (req, res) {
-        res.end('session saved');
-      });
+      const server = createServer(
+        { store, saveUninitialized: true },
+        function (req, res) {
+          res.end('session saved');
+        }
+      );
 
       store.set = function destroy(sid, sess, callback) {
         callback(new Error('boom!'));
@@ -498,84 +542,77 @@ describe('session options', function () {
     });
 
     it('should prevent uninitialized session from being touched', function (_, done) {
-      const cb = after(1, done);
       const store = new session.MemoryStore();
-      const server = createServer({ saveUninitialized: false, store, cookie: { maxAge: min } },
+      const server = createServer(
+        { saveUninitialized: false, store, cookie: { maxAge: min } },
         function (req, res) {
           res.end();
         }
       );
 
       store.touch = function () {
-        cb(new Error('should not be called'));
+        assert.fail('should not call touch');
       };
 
-      request(server).get('/').expect(200, cb);
+      request(server).get('/').expect(200, done);
     });
   });
 
   describe('secret option', function () {
     it('should sign and unsign with a string', function (_, done) {
-      const server = createServer({ secret: 'awesome cat' }, function (req, res) {
-        if (!req.session.user) {
-          req.session.user = 'bob';
-          res.end('set');
-        } else {
-          res.end('get:' + JSON.stringify(req.session.user));
+      const server = createServer(
+        { secret: 'awesome cat' },
+        function (req, res) {
+          if (!req.session.user) {
+            req.session.user = 'bob';
+            res.end('set');
+          } else {
+            res.end('get:' + JSON.stringify(req.session.user));
+          }
         }
-      });
+      );
 
       request(server)
         .get('/')
         .expect(shouldSetCookie('connect.sid'))
         .expect(200, 'set', function (err, res) {
           if (err) return done(err);
-          request(server).get('/').set('Cookie', cookie(res)).expect(200, 'get:"bob"', done);
+          request(server)
+            .get('/')
+            .set('Cookie', cookie(res))
+            .expect(200, 'get:"bob"', done);
         });
     });
 
     describe('when an array', function () {
       it('should sign cookies', function (_, done) {
-        const server = createServer({ secret: ['keyboard cat', 'nyan cat'] }, function (req, res) {
-          req.session.user = 'bob';
-          res.end(req.session.user);
-        });
-
-        request(server).get('/').expect(shouldSetCookie('connect.sid')).expect(200, 'bob', done);
-      });
-
-      it('should sign cookies with first element', function (_, done) {
-        const store = new session.MemoryStore();
-
-        const server1 = createServer({ secret: ['keyboard cat', 'nyan cat'], store },
+        const server = createServer(
+          { secret: ['keyboard cat', 'nyan cat'] },
           function (req, res) {
             req.session.user = 'bob';
             res.end(req.session.user);
           }
         );
 
-        const server2 = createServer({ secret: 'nyan cat', store }, function (req, res) {
-          res.end(String(req.session.user));
-        });
-
-        request(server1)
+        request(server)
           .get('/')
           .expect(shouldSetCookie('connect.sid'))
-          .expect(200, 'bob', function (err, res) {
-            if (err) return done(err);
-            request(server2).get('/').set('Cookie', cookie(res)).expect(200, 'undefined', done);
-          });
+          .expect(200, 'bob', done);
       });
 
-      it('should read cookies using all elements', function (_, done) {
+      it('should sign cookies with first element', function (_, done) {
         const store = new session.MemoryStore();
 
-        const server1 = createServer({ secret: 'nyan cat', store }, function (req, res) {
-          req.session.user = 'bob';
-          res.end(req.session.user);
-        });
+        const server1 = createServer(
+          { secret: ['keyboard cat', 'nyan cat'], store },
+          function (req, res) {
+            req.session.user = 'bob';
+            res.end(req.session.user);
+          }
+        );
 
-        const server2 = createServer({ secret: ['keyboard cat', 'nyan cat'], store },
+        const server2 = createServer(
+          { secret: 'nyan cat', store },
           function (req, res) {
             res.end(String(req.session.user));
           }
@@ -586,7 +623,40 @@ describe('session options', function () {
           .expect(shouldSetCookie('connect.sid'))
           .expect(200, 'bob', function (err, res) {
             if (err) return done(err);
-            request(server2).get('/').set('Cookie', cookie(res)).expect(200, 'bob', done);
+            request(server2)
+              .get('/')
+              .set('Cookie', cookie(res))
+              .expect(200, 'undefined', done);
+          });
+      });
+
+      it('should read cookies using all elements', function (_, done) {
+        const store = new session.MemoryStore();
+
+        const server1 = createServer(
+          { secret: 'nyan cat', store },
+          function (req, res) {
+            req.session.user = 'bob';
+            res.end(req.session.user);
+          }
+        );
+
+        const server2 = createServer(
+          { secret: ['keyboard cat', 'nyan cat'], store },
+          function (req, res) {
+            res.end(String(req.session.user));
+          }
+        );
+
+        request(server1)
+          .get('/')
+          .expect(shouldSetCookie('connect.sid'))
+          .expect(200, 'bob', function (err, res) {
+            if (err) return done(err);
+            request(server2)
+              .get('/')
+              .set('Cookie', cookie(res))
+              .expect(200, 'bob', done);
           });
       });
     });
@@ -630,12 +700,15 @@ describe('session options', function () {
 
     it('should allow destroy on req.session = null', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, unset: 'destroy' }, function (req, res) {
-        req.session.count = req.session.count || 0;
-        req.session.count++;
-        if (req.session.count === 2) req.session = null;
-        res.end();
-      });
+      const server = createServer(
+        { store, unset: 'destroy' },
+        function (req, res) {
+          req.session.count = req.session.count || 0;
+          req.session.count++;
+          if (req.session.count === 2) req.session = null;
+          res.end();
+        }
+      );
 
       request(server)
         .get('/')
@@ -661,10 +734,13 @@ describe('session options', function () {
 
     it('should not set cookie if initial session destroyed', function (_, done) {
       const store = new session.MemoryStore();
-      const server = createServer({ store, unset: 'destroy' }, function (req, res) {
-        req.session = null;
-        res.end();
-      });
+      const server = createServer(
+        { store, unset: 'destroy' },
+        function (req, res) {
+          req.session = null;
+          res.end();
+        }
+      );
 
       request(server)
         .get('/')
@@ -682,10 +758,13 @@ describe('session options', function () {
     it('should pass session destroy error', function (_, done) {
       const cb = after(2, done);
       const store = new session.MemoryStore();
-      const server = createServer({ store, unset: 'destroy' }, function (req, res) {
-        req.session = null;
-        res.end('session destroyed');
-      });
+      const server = createServer(
+        { store, unset: 'destroy' },
+        function (req, res) {
+          req.session = null;
+          res.end('session destroyed');
+        }
+      );
 
       store.destroy = function destroy(sid, callback) {
         callback(new Error('boom!'));
@@ -700,5 +779,4 @@ describe('session options', function () {
       request(server).get('/').expect(200, 'session destroyed', cb);
     });
   });
-
 });
