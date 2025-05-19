@@ -22,11 +22,10 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@pirxpilot/connect": "~4",
-    "after": "~0",
     "cookie": "~1",
     "cookie-parser": "~1",
     "cookie-signature": "~1",
-    "supertest": "~7"
+    "supertest-fetch": "~2"
   },
   "files": [
     "session/",

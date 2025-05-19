@@ -1,7 +1,8 @@
 const { describe, it } = require('node:test');
-const request = require('supertest');
+const { fetch } = require('supertest-fetch');
 const utils = require('../support/utils');
 const { cookie } = utils;
+const { createServer } = require('node:http');
 
 const cookieParser = require('cookie-parser');
 const connect = require('@pirxpilot/connect');
@@ -28,14 +29,14 @@ describe('cookieParser()', function () {
         res.end(req.session.count.toString());
       });
 
-    const res = await request(app)
-      .get('/')
-      .expect(shouldSetCookie('sessid'))
-      .expect(200, '1');
+    const server = createServer(app);
+    const res = await fetch(server, '/').expect(200, '1');
+
+    shouldSetCookie('sessid')(res);
 
     const val = 'sessid=' + utils.sid(res);
 
-    await request(app).get('/').set('Cookie', val).expect(200, '1');
+    await fetch(server, '/', { headers: { Cookie: val } }).expect(200, '1');
   });
 
   it('should reject invalid signature from req.cookies', async function () {
@@ -53,14 +54,14 @@ describe('cookieParser()', function () {
         res.end(req.session.count.toString());
       });
 
-    const res = await request(app)
-      .get('/')
-      .expect(shouldSetCookie('sessid'))
-      .expect(200, '1');
+    const server = createServer(app);
+
+    const res = await fetch(server, '/').expect(200, '1');
+    shouldSetCookie('sessid')(res);
 
     const val = cookie(res).replace(/...\./, '.');
 
-    await request(app).get('/').set('Cookie', val).expect(200, '1');
+    await fetch(server, '/', { headers: { Cookie: val } }).expect(200, '1');
   });
 
   it('should read from req.signedCookies', async function () {
@@ -77,8 +78,13 @@ describe('cookieParser()', function () {
         res.end(req.session.count.toString());
       });
 
-    const res = await request(app).get('/').expect(200, '1');
+    const server = createServer(app);
 
-    await request(app).get('/').set('Cookie', cookie(res)).expect(200, '2');
+    const res = await fetch(server, '/').expect(200, '1');
+
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+      200,
+      '2'
+    );
   });
 });

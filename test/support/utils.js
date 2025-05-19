@@ -1,10 +1,42 @@
+const { promisify } = require('node:util');
+
 module.exports = {
   cookie,
   sid,
   expires,
   parseSetCookie,
-  writePatch
+  writePatch,
+  storeGet,
+  storeLen,
+  storeSet,
+  storeLoad,
+  storeClear
 };
+
+function storeLen(store) {
+  const fn = promisify(store.length).bind(store);
+  return fn();
+}
+
+function storeGet(store, ...args) {
+  const fn = promisify(store.get).bind(store);
+  return fn(...args);
+}
+
+function storeSet(store, ...args) {
+  const fn = promisify(store.set).bind(store);
+  return fn(...args);
+}
+
+function storeLoad(store, ...args) {
+  const fn = promisify(store.load).bind(store);
+  return fn(...args);
+}
+
+function storeClear(store) {
+  const fn = promisify(store.clear).bind(store);
+  return fn();
+}
 
 function parseSetCookie(header = '') {
   let match;
@@ -55,7 +87,7 @@ function sid(res) {
 }
 
 function cookie(res) {
-  return res.headers['set-cookie']?.[0];
+  return res.headers.getSetCookie()[0];
 }
 
 function expires(res) {

@@ -78,7 +78,7 @@ function end(req, res) {
 }
 
 function mountAt(path) {
-  return function (req, res) {
+  return function (req, _res) {
     if (req.url.indexOf(path) === 0) {
       req.originalUrl = req.url;
       req.url = req.url.slice(path.length);

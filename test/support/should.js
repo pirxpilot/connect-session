@@ -36,7 +36,7 @@ function shouldSetSessionInStore(store, delay) {
 function shouldNotHaveHeader(header) {
   return function (res) {
     assert.ok(
-      !(header.toLowerCase() in res.headers),
+      !res.headers.has(header),
       'should not have ' + header + ' header'
     );
   };
@@ -78,9 +78,9 @@ function shouldSetCookieToExpireIn(name, delta) {
     assert.ok(header, 'should have a cookie header');
     assert.strictEqual(data.name, name, 'should set cookie ' + name);
     assert.ok('expires' in data, 'should set cookie with attribute Expires');
-    assert.ok('date' in res.headers, 'should have a date header');
+    assert.ok(res.headers.has('date'), 'should have a date header');
     assert.strictEqual(
-      Date.parse(data.expires) - Date.parse(res.headers.date),
+      Date.parse(data.expires) - Date.parse(res.headers.get('date')),
       delta,
       'should set cookie ' + name + ' to expire in ' + delta + ' ms'
     );

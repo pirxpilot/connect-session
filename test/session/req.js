@@ -1,20 +1,17 @@
-const { before, describe, it } = require('node:test');
+const { before, describe, it, after } = require('node:test');
 const assert = require('node:assert');
-const request = require('supertest');
-const after = require('after');
-
+const { fetch } = require('supertest-fetch');
+const timers = require('node:timers/promises');
 const http = require('node:http');
 
 const utils = require('../support/utils');
-const { cookie } = utils;
+const { cookie, storeGet, storeLoad } = utils;
 const SmartStore = require('../support/smart-store');
 
 const session = require('../../');
 
 const {
   shouldSetSessionInStore,
-  shouldNotHaveHeader,
-  shouldSetCookie,
   shouldSetCookieToExpireIn,
   shouldSetCookieToDifferentSessionId,
   shouldSetCookieWithAttributeAndValue,
@@ -28,7 +25,7 @@ const { createServer, createRequestListener } = require('../support/server');
 const min = 60 * 1000;
 
 describe('req.session', function () {
-  it('should persist', function (_, done) {
+  it('should persist', async function () {
     const store = new session.MemoryStore();
     const server = createServer({ store }, function (req, res) {
       req.session.count = req.session.count || 0;
@@ -36,22 +33,16 @@ describe('req.session', function () {
       res.end('hits: ' + req.session.count);
     });
 
-    request(server)
-      .get('/')
-      .expect(200, 'hits: 1', function (err, res) {
-        if (err) return done(err);
-        store.load(utils.sid(res), function (err, sess) {
-          if (err) return done(err);
-          assert.ok(sess);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(200, 'hits: 2', done);
-        });
-      });
+    const res = await fetch(server, '/').expect(200, 'hits: 1');
+    const sess = await storeLoad(store, utils.sid(res));
+    assert.ok(sess);
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+      200,
+      'hits: 2'
+    );
   });
 
-  it('should only set-cookie when modified', function (_, done) {
+  it('should only set-cookie when modified', async function () {
     let modify = true;
     const server = createServer(null, function (req, res) {
       if (modify) {
@@ -61,37 +52,26 @@ describe('req.session', function () {
       res.end(req.session.count.toString());
     });
 
-    request(server)
-      .get('/')
-      .expect(200, '1', function (err, res) {
-        if (err) return done(err);
-        request(server)
-          .get('/')
-          .set('Cookie', cookie(res))
-          .expect(200, '2', function (err, res) {
-            if (err) return done(err);
-            const val = cookie(res);
-            modify = false;
+    let res = await fetch(server, '/').expect(200, '1');
+    res = await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+      200,
+      '2'
+    );
+    const val = cookie(res);
+    modify = false;
 
-            request(server)
-              .get('/')
-              .set('Cookie', val)
-              .expect(shouldNotHaveHeader('Set-Cookie'))
-              .expect(200, '2', function (err, res) {
-                if (err) return done(err);
-                modify = true;
+    res = await fetch(server, '/', { headers: { Cookie: val } })
+      .expect('Set-Cookie', null)
+      .expect(200, '2');
 
-                request(server)
-                  .get('/')
-                  .set('Cookie', val)
-                  .expect(shouldSetCookie('connect.sid'))
-                  .expect(200, '3', done);
-              });
-          });
-      });
+    modify = true;
+
+    await fetch(server, '/', { headers: { Cookie: val } })
+      .expect('Set-Cookie', /connect.sid/)
+      .expect(200, '3');
   });
 
-  it('should not have enumerable methods', function (_, done) {
+  it('should not have enumerable methods', async function () {
     const server = createServer(null, function (req, res) {
       req.session.foo = 'foo';
       req.session.bar = 'bar';
@@ -102,10 +82,10 @@ describe('req.session', function () {
       res.end(keys.sort().join(','));
     });
 
-    request(server).get('/').expect(200, 'bar,cookie,foo', done);
+    await fetch(server, '/').expect(200, 'bar,cookie,foo');
   });
 
-  it('should not be set if store is disconnected', function (_, done) {
+  it('should not be set if store is disconnected', async function () {
     const store = new session.MemoryStore();
     const server = createServer({ store }, function (req, res) {
       res.end(typeof req.session);
@@ -113,13 +93,12 @@ describe('req.session', function () {
 
     store.emit('disconnect');
 
-    request(server)
-      .get('/')
-      .expect(shouldNotHaveHeader('Set-Cookie'))
-      .expect(200, 'undefined', done);
+    await fetch(server, '/')
+      .expect('Set-Cookie', null)
+      .expect(200, 'undefined');
   });
 
-  it('should be set when store reconnects', function (_, done) {
+  it('should be set when store reconnects', async function () {
     const store = new session.MemoryStore();
     const server = createServer({ store }, function (req, res) {
       res.end(typeof req.session);
@@ -127,20 +106,17 @@ describe('req.session', function () {
 
     store.emit('disconnect');
 
-    request(server)
-      .get('/')
-      .expect(shouldNotHaveHeader('Set-Cookie'))
-      .expect(200, 'undefined', function (err) {
-        if (err) return done(err);
+    await fetch(server, '/')
+      .expect('Set-Cookie', null)
+      .expect(200, 'undefined');
 
-        store.emit('connect');
+    store.emit('connect');
 
-        request(server).get('/').expect(200, 'object', done);
-      });
+    await fetch(server, '/').expect(200, 'object');
   });
 
   describe('.destroy()', function () {
-    it('should destroy the previous session', function (_, done) {
+    it('should destroy the previous session', async function () {
       const server = createServer(null, function (req, res) {
         req.session.destroy(function (err) {
           if (err) res.statusCode = 500;
@@ -148,15 +124,14 @@ describe('req.session', function () {
         });
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldNotHaveHeader('Set-Cookie'))
-        .expect(200, 'undefined', done);
+      await fetch(server, '/')
+        .expect('Set-Cookie', null)
+        .expect(200, 'undefined');
     });
   });
 
   describe('.regenerate()', function () {
-    it('should destroy/replace the previous session', function (_, done) {
+    it('should destroy/replace the previous session', async function () {
       const server = createServer(null, function (req, res) {
         const id = req.session.id;
         req.session.regenerate(function (err) {
@@ -165,24 +140,30 @@ describe('req.session', function () {
         });
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldSetCookie('connect.sid'))
-            .expect(shouldSetCookieToDifferentSessionId(utils.sid(res)))
-            .expect(200, 'false', done);
-        });
+      const res = await fetch(server, '/')
+        .expect('Set-Cookie', /connect\.sid/)
+        .expect(200);
+      const res2 = await fetch(server, '/', {
+        headers: { Cookie: cookie(res) }
+      })
+        .expect('Set-Cookie', /connect\.sid/)
+        .expect(200, 'false');
+      shouldSetCookieToDifferentSessionId(utils.sid(res))(res2);
     });
   });
 
   describe('.reload()', function () {
-    it('should reload session from store', function (_, done) {
-      const server = createServer(null, function (req, res) {
+    it('should reload session from store', async function () {
+      const server = createServer(null, respond);
+
+      const res = await fetch(server, '/').expect(200, 'session created');
+      const val = cookie(res);
+      await fetch(server, '/foo', { headers: { Cookie: val } }).expect(
+        200,
+        'saw /bar'
+      );
+
+      function respond(req, res) {
         if (req.url === '/') {
           req.session.active = true;
           res.end('session created');
@@ -196,32 +177,17 @@ describe('req.session', function () {
           return;
         }
 
-        request(server)
-          .get('/bar')
-          .set('Cookie', val)
-          .expect(200, 'saw /bar', function (err, resp) {
-            if (err) return done(err);
-            req.session.reload(function (err) {
-              if (err) return done(err);
+        fetch(server, '/bar', { headers: { Cookie: val } })
+          .expect(200, 'saw /bar')
+          .then(function (resp) {
+            req.session.reload(function () {
               res.end('saw ' + req.session.url);
             });
           });
-      });
-      let val;
-
-      request(server)
-        .get('/')
-        .expect(200, 'session created', function (err, res) {
-          if (err) return done(err);
-          val = cookie(res);
-          request(server)
-            .get('/foo')
-            .set('Cookie', val)
-            .expect(200, 'saw /bar', done);
-        });
+      }
     });
 
-    it('should error is session missing', function (_, done) {
+    it('should error is session missing', async function () {
       const store = new session.MemoryStore();
       const server = createServer({ store }, function (req, res) {
         if (req.url === '/') {
@@ -231,7 +197,7 @@ describe('req.session', function () {
         }
 
         store.clear(function (err) {
-          if (err) return done(err);
+          if (err) return res.end(err.message);
           req.session.reload(function (err) {
             res.statusCode = err ? 500 : 200;
             res.end(err ? err.message : '');
@@ -239,18 +205,14 @@ describe('req.session', function () {
         });
       });
 
-      request(server)
-        .get('/')
-        .expect(200, 'session created', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/foo')
-            .set('Cookie', cookie(res))
-            .expect(500, 'failed to load session', done);
-        });
+      const res = await fetch(server, '/').expect(200, 'session created');
+      await fetch(server, '/foo', { headers: { Cookie: cookie(res) } }).expect(
+        500,
+        'failed to load session'
+      );
     });
 
-    it('should not override an overriden `reload` in case of errors', function (_, done) {
+    it('should not override an overriden `reload` in case of errors', async function () {
       const store = new session.MemoryStore();
       const server = createServer(
         { store, resave: false },
@@ -262,7 +224,7 @@ describe('req.session', function () {
           }
 
           store.clear(function (err) {
-            if (err) return done(err);
+            if (err) return res.end(err.message);
 
             // reload way too many times on top of each other,
             // attempting to overflow the call stack
@@ -286,20 +248,16 @@ describe('req.session', function () {
         }
       );
 
-      request(server)
-        .get('/')
-        .expect(200, 'session created', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/foo')
-            .set('Cookie', cookie(res))
-            .expect(200, 'ok', done);
-        });
+      const res = await fetch(server, '/').expect(200, 'session created');
+      await fetch(server, '/foo', { headers: { Cookie: cookie(res) } }).expect(
+        200,
+        'ok'
+      );
     });
   });
 
   describe('.save()', function () {
-    it('should save session to store', function (_, done) {
+    it('should save session to store', async function () {
       const store = new session.MemoryStore();
       const server = createServer({ store }, function (req, res) {
         req.session.hit = true;
@@ -312,10 +270,10 @@ describe('req.session', function () {
         });
       });
 
-      request(server).get('/').expect(200, 'stored', done);
+      await fetch(server, '/').expect(200, 'stored');
     });
 
-    it('should prevent end-of-request save', function (_, done) {
+    it('should prevent end-of-request save', async function () {
       const store = new session.MemoryStore();
       const server = createServer({ store }, function (req, res) {
         req.session.hit = true;
@@ -325,20 +283,19 @@ describe('req.session', function () {
         });
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(200, 'saved', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldSetSessionInStore(store))
-            .expect(200, 'saved', done);
-        });
+      let check = shouldSetSessionInStore(store);
+      const res = await fetch(server, '/').expect(200, 'saved');
+      check();
+      check = shouldSetSessionInStore(store);
+
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+        200,
+        'saved'
+      );
+      check();
     });
 
-    it('should prevent end-of-request save on reloaded session', function (_, done) {
+    it('should prevent end-of-request save on reloaded session', async function () {
       const store = new session.MemoryStore();
       const server = createServer({ store }, function (req, res) {
         req.session.hit = true;
@@ -350,21 +307,20 @@ describe('req.session', function () {
         });
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(200, 'saved', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldSetSessionInStore(store))
-            .expect(200, 'saved', done);
-        });
+      let check = shouldSetSessionInStore(store);
+      const res = await fetch(server, '/').expect(200, 'saved');
+      check();
+
+      check = shouldSetSessionInStore(store);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+        200,
+        'saved'
+      );
+      check();
     });
 
     describe('when saveUninitialized is false', function () {
-      it('should prevent end-of-request save', function (_, done) {
+      it('should prevent end-of-request save', async function () {
         const store = new session.MemoryStore();
         const server = createServer(
           { saveUninitialized: false, store },
@@ -377,23 +333,22 @@ describe('req.session', function () {
           }
         );
 
-        request(server)
-          .get('/')
-          .expect(shouldSetSessionInStore(store))
-          .expect(200, 'saved', function (err, res) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetSessionInStore(store))
-              .expect(200, 'saved', done);
-          });
+        let check = shouldSetSessionInStore(store);
+        const res = await fetch(server, '/').expect(200, 'saved');
+        check();
+
+        check = shouldSetSessionInStore(store);
+        await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+          200,
+          'saved'
+        );
+        check();
       });
     });
   });
 
   describe('.touch()', function () {
-    it('should reset session expiration', function (_, done) {
+    it('should reset session expiration', async function () {
       const store = new session.MemoryStore();
       const server = createServer(
         { resave: false, store, cookie: { maxAge: min } },
@@ -404,38 +359,26 @@ describe('req.session', function () {
         }
       );
 
-      request(server)
-        .get('/')
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          const id = utils.sid(res);
-          store.get(id, function (err, sess) {
-            if (err) return done(err);
-            const exp = new Date(sess.cookie.expires);
-            setTimeout(function () {
-              request(server)
-                .get('/')
-                .set('Cookie', cookie(res))
-                .expect(200, function (err, res) {
-                  if (err) return done(err);
-                  store.get(id, function (err, sess) {
-                    if (err) return done(err);
-                    assert.notStrictEqual(
-                      new Date(sess.cookie.expires).getTime(),
-                      exp.getTime()
-                    );
-                    done();
-                  });
-                });
-            }, 100);
-          });
-        });
+      const res = await fetch(server, '/').expect(200);
+      const id = utils.sid(res);
+      let sess = await storeGet(store, id);
+      const exp = new Date(sess.cookie.expires);
+
+      await timers.setTimeout(100);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(
+        200
+      );
+      sess = await storeGet(store, id);
+      assert.notStrictEqual(
+        new Date(sess.cookie.expires).getTime(),
+        exp.getTime()
+      );
     });
   });
 
   describe('.cookie', function () {
     describe('.*', function () {
-      it('should serialize as parameters', function (_, done) {
+      it('should serialize as parameters', async function () {
         const server = createServer({}, function (req, res) {
           req.secure = true;
           req.session.cookie.httpOnly = false;
@@ -443,37 +386,32 @@ describe('req.session', function () {
           res.end();
         });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly'))
-          .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
-          .expect(200, done);
+        const res = await fetch(server, '/').expectStatus(200);
+        shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly')(res);
+        shouldSetCookieWithAttribute('connect.sid', 'Secure')(res);
       });
 
-      it('should default to a browser-session length cookie', function (_, done) {
-        request(createServer({ cookie: { path: '/admin' } }))
-          .get('/admin')
-          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Expires'))
-          .expect(200, done);
+      it('should default to a browser-session length cookie', async function () {
+        const res = await fetch(
+          createServer({ cookie: { path: '/admin' } }),
+          '/admin'
+        ).expectStatus(200);
+        shouldSetCookieWithoutAttribute('connect.sid', 'Expires')(res);
       });
 
-      it('should Set-Cookie only once for browser-session cookies', function (_, done) {
+      it('should Set-Cookie only once for browser-session cookies', async function () {
         const server = createServer({ cookie: { path: '/admin' } });
 
-        request(server)
-          .get('/admin/foo')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, function (err, res) {
-            if (err) return done(err);
-            request(server)
-              .get('/admin')
-              .set('Cookie', cookie(res))
-              .expect(shouldNotHaveHeader('Set-Cookie'))
-              .expect(200, done);
-          });
+        const res = await fetch(server, '/admin/foo')
+          .expect('Set-Cookie', /connect\.sid/)
+          .expect(200);
+
+        await fetch(server, '/admin', { headers: { Cookie: cookie(res) } })
+          .expect('Set-Cookie', null)
+          .expectStatus(200);
       });
 
-      it('should override defaults', function (_, done) {
+      it('should override defaults', async function () {
         const opts = {
           httpOnly: false,
           maxAge: 5000,
@@ -486,30 +424,23 @@ describe('req.session', function () {
           res.end();
         });
 
-        request(server)
-          .get('/admin')
-          .expect(shouldSetCookieWithAttribute('connect.sid', 'Expires'))
-          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly'))
-          .expect(
-            shouldSetCookieWithAttributeAndValue(
-              'connect.sid',
-              'Path',
-              '/admin'
-            )
-          )
-          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
-          .expect(
-            shouldSetCookieWithAttributeAndValue(
-              'connect.sid',
-              'Priority',
-              'High'
-            )
-          )
-          .expect(200, done);
+        const res = await fetch(server, '/admin').expectStatus(200);
+        shouldSetCookieWithAttribute('connect.sid', 'Expires')(res);
+        shouldSetCookieWithoutAttribute('connect.sid', 'HttpOnly')(res);
+        shouldSetCookieWithAttributeAndValue(
+          'connect.sid',
+          'Path',
+          '/admin'
+        )(res);
+        shouldSetCookieWithoutAttribute('connect.sid', 'Secure')(res);
+        shouldSetCookieWithAttributeAndValue(
+          'connect.sid',
+          'Priority',
+          'High'
+        )(res);
       });
 
-      it('should forward errors setting cookie', function (_, done) {
-        const cb = after(2, done);
+      it('should forward errors setting cookie', async function () {
         const server = createServer(
           { cookie: { expires: new Date(Number.NaN) } },
           function (req, res) {
@@ -517,28 +448,27 @@ describe('req.session', function () {
           }
         );
 
+        const { promise, resolve } = Promise.withResolvers();
         server.on('error', function onerror(err) {
           assert.ok(err);
           assert.match(err.message, /option expires is invalid/i);
-          cb();
+          resolve();
         });
 
-        request(server).get('/admin').expect(200, cb);
+        await Promise.all([promise, fetch(server, '/admin').expect(200)]);
       });
 
-      it('should preserve cookies set before writeHead is called', function (_, done) {
+      it('should preserve cookies set before writeHead is called', async function () {
         const server = createServer(null, function (req, res) {
           res.setHeader('Set-Cookie', 'previous=cookieValue');
           res.end();
         });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetCookieToValue('previous', 'cookieValue'))
-          .expect(200, done);
+        const res = await fetch(server, '/').expectStatus(200);
+        shouldSetCookieToValue('previous', 'cookieValue')(res);
       });
 
-      it('should preserve cookies set in writeHead', function (_, done) {
+      it('should preserve cookies set in writeHead', async function () {
         const server = createServer(null, function (req, res) {
           res.writeHead(200, {
             'Set-Cookie': 'previous=cookieValue'
@@ -546,15 +476,13 @@ describe('req.session', function () {
           res.end();
         });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetCookieToValue('previous', 'cookieValue'))
-          .expect(200, done);
+        const res = await fetch(server, '/').expectStatus(200);
+        shouldSetCookieToValue('previous', 'cookieValue')(res);
       });
     });
 
     describe('.originalMaxAge', function () {
-      it('should equal original maxAge', function (_, done) {
+      it('should equal original maxAge', async function () {
         const server = createServer(
           { cookie: { maxAge: 2000 } },
           function (req, res) {
@@ -562,20 +490,16 @@ describe('req.session', function () {
           }
         );
 
-        request(server)
-          .get('/')
-          .expect(200)
-          .expect(function (res) {
-            // account for 1ms latency
-            assert.ok(
-              res.text === '2000' || res.text === '1999',
-              'expected 2000, got ' + res.text
-            );
-          })
-          .end(done);
+        const res = await fetch(server, '/').expect(200);
+        // account for 1ms latency
+        const text = await res.text();
+        assert.ok(
+          text === '2000' || text === '1999',
+          'expected 2000, got ' + text
+        );
       });
 
-      it('should equal original maxAge for all requests', function (_, done) {
+      it('should equal original maxAge for all requests', async function () {
         const server = createServer(
           { cookie: { maxAge: 2000 } },
           function (req, res) {
@@ -583,264 +507,210 @@ describe('req.session', function () {
           }
         );
 
-        request(server)
-          .get('/')
-          .expect(200)
-          .expect(function (res) {
-            // account for 1ms latency
-            assert.ok(
-              res.text === '2000' || res.text === '1999',
-              'expected 2000, got ' + res.text
-            );
-          })
-          .end(function (err, res) {
-            if (err) return done(err);
-            setTimeout(function () {
-              request(server)
-                .get('/')
-                .set('Cookie', cookie(res))
-                .expect(200)
-                .expect(function (res) {
-                  // account for 1ms latency
-                  assert.ok(
-                    res.text === '2000' || res.text === '1999',
-                    'expected 2000, got ' + res.text
-                  );
-                })
-                .end(done);
-            }, 100);
-          });
-      });
+        let res = await fetch(server, '/').expect(200);
 
-      it('should equal original maxAge for all requests', function (_, done) {
-        const store = new SmartStore();
-        const server = createServer(
-          { cookie: { maxAge: 2000 }, store },
-          function (req, res) {
-            res.end(JSON.stringify(req.session.cookie.originalMaxAge));
-          }
+        // account for 1ms latency
+        let text = await res.text();
+        assert.ok(
+          text === '2000' || text === '1999',
+          'expected 2000, got ' + text
         );
+        await timers.setTimeout(100);
 
-        request(server)
-          .get('/')
-          .expect(200)
-          .expect(function (res) {
-            // account for 1ms latency
-            assert.ok(
-              res.text === '2000' || res.text === '1999',
-              'expected 2000, got ' + res.text
-            );
-          })
-          .end(function (err, res) {
-            if (err) return done(err);
-            setTimeout(function () {
-              request(server)
-                .get('/')
-                .set('Cookie', cookie(res))
-                .expect(200)
-                .expect(function (res) {
-                  // account for 1ms latency
-                  assert.ok(
-                    res.text === '2000' || res.text === '1999',
-                    'expected 2000, got ' + res.text
-                  );
-                })
-                .end(done);
-            }, 100);
-          });
-      });
-    });
-
-    describe('.secure', function () {
-      let app;
-
-      before(function () {
-        app = createRequestListener({
-          secret: 'keyboard cat',
-          cookie: { secure: true }
-        });
-      });
-
-      it('should not set-cookie when insecure', function (_, done) {
-        const server = http.createServer(app);
-
-        request(server)
-          .get('/')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, done);
-      });
-    });
-
-    describe('.maxAge', function () {
-      const ctx = {};
-
-      before(function (_, done) {
-        ctx.cookie = '';
-        ctx.server = createServer(
-          { cookie: { maxAge: 2000 } },
-          function (req, res) {
-            switch (++req.session.count) {
-              case 1:
-                break;
-              case 2:
-                req.session.cookie.maxAge = 5000;
-                break;
-              case 3:
-                req.session.cookie.maxAge = 3000000000;
-                break;
-              default:
-                req.session.count = 0;
-                break;
-            }
-            res.end(req.session.count.toString());
-          }
+        res = await fetch(server, '/', {
+          headers: { Cookie: cookie(res) }
+        }).expect(200);
+        // account for 1ms latency
+        text = await res.text();
+        assert.ok(
+          text === '2000' || text === '1999',
+          'expected 2000, got ' + text
         );
-
-        request(ctx.server)
-          .get('/')
-          .end(function (err, res) {
-            ctx.cookie = res && cookie(res);
-            done(err);
-          });
-      });
-
-      it('should set cookie expires relative to maxAge', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('Cookie', ctx.cookie)
-          .expect(shouldSetCookieToExpireIn('connect.sid', 2000))
-          .expect(200, '1', done);
-      });
-
-      it('should modify cookie expires when changed', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('Cookie', ctx.cookie)
-          .expect(shouldSetCookieToExpireIn('connect.sid', 5000))
-          .expect(200, '2', done);
-      });
-
-      it('should modify cookie expires when changed to large value', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('Cookie', ctx.cookie)
-          .expect(shouldSetCookieToExpireIn('connect.sid', 3000000000))
-          .expect(200, '3', done);
       });
     });
+  });
 
-    describe('.expires', function () {
-      describe('when given a Date', function () {
-        it('should set absolute', function (_, done) {
-          const server = createServer(null, function (req, res) {
-            req.session.cookie.expires = new Date(0);
-            res.end();
-          });
+  it('should equal original maxAge for all requests', async function () {
+    const store = new SmartStore();
+    const server = createServer(
+      { cookie: { maxAge: 2000 }, store },
+      function (req, res) {
+        res.end(JSON.stringify(req.session.cookie.originalMaxAge));
+      }
+    );
 
-          request(server)
-            .get('/')
-            .expect(
-              shouldSetCookieWithAttributeAndValue(
-                'connect.sid',
-                'Expires',
-                'Thu, 01 Jan 1970 00:00:00 GMT'
-              )
-            )
-            .expect(200, done);
-        });
+    let res = await fetch(server, '/').expect(200);
+    // account for 1ms latency
+    let text = await res.text();
+    assert.ok(text === '2000' || text === '1999', 'expected 2000, got ' + text);
+    await timers.setTimeout(100);
+    res = await fetch(server, '/', {
+      headers: { Cookie: cookie(res) }
+    }).expect(200);
+    // account for 1ms latency
+    text = await res.text();
+    assert.ok(text === '2000' || text === '1999', 'expected 2000, got ' + text);
+  });
+});
+
+describe('.secure', function () {
+  let server;
+
+  before(function () {
+    const app = createRequestListener({
+      secret: 'keyboard cat',
+      cookie: { secure: true }
+    });
+    server = http.createServer(app);
+  });
+
+  after(function () {
+    server.close();
+  });
+
+  it('should not set-cookie when insecure', async function () {
+    await fetch(server, '/').expect('Set-Cookie', null).expectStatus(200);
+  });
+});
+
+describe('.maxAge', function () {
+  const ctx = {};
+
+  before(async function () {
+    ctx.cookie = '';
+    ctx.server = createServer(
+      { cookie: { maxAge: 2000 } },
+      function (req, res) {
+        switch (++req.session.count) {
+          case 1:
+            break;
+          case 2:
+            req.session.cookie.maxAge = 5000;
+            break;
+          case 3:
+            req.session.cookie.maxAge = 3000000000;
+            break;
+          default:
+            req.session.count = 0;
+            break;
+        }
+        res.end(req.session.count.toString());
+      }
+    );
+
+    const res = await fetch(ctx.server, '/');
+    ctx.cookie = cookie(res);
+  });
+
+  after(function () {
+    ctx.server.close();
+  });
+
+  it('should set cookie expires relative to maxAge', async function () {
+    const res = await fetch(ctx.server, '/', {
+      headers: { Cookie: ctx.cookie }
+    }).expect(200, '1');
+    shouldSetCookieToExpireIn('connect.sid', 2000)(res);
+  });
+
+  it('should modify cookie expires when changed', async function () {
+    const res = await fetch(ctx.server, '/', {
+      headers: { Cookie: ctx.cookie }
+    }).expect(200, '2');
+    shouldSetCookieToExpireIn('connect.sid', 5000)(res);
+  });
+
+  it('should modify cookie expires when changed to large value', async function () {
+    const res = await fetch(ctx.server, '/', {
+      headers: { Cookie: ctx.cookie }
+    }).expect(200, '3');
+    shouldSetCookieToExpireIn('connect.sid', 3000000000)(res);
+  });
+});
+
+describe('.expires', function () {
+  describe('when given a Date', function () {
+    it('should set absolute', async function () {
+      const server = createServer(null, function (req, res) {
+        req.session.cookie.expires = new Date(0);
+        res.end();
       });
 
-      describe('when null', function () {
-        it('should be a browser-session cookie', function (_, done) {
-          const server = createServer(null, function (req, res) {
-            req.session.cookie.expires = null;
-            res.end();
-          });
+      const res = await fetch(server, '/').expectStatus(200);
+      shouldSetCookieWithAttributeAndValue(
+        'connect.sid',
+        'Expires',
+        'Thu, 01 Jan 1970 00:00:00 GMT'
+      )(res);
+    });
+  });
 
-          request(server)
-            .get('/')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Expires'))
-            .expect(200, done);
-        });
-
-        it('should not reset cookie', function (_, done) {
-          const server = createServer(null, function (req, res) {
-            req.session.cookie.expires = null;
-            res.end();
-          });
-
-          request(server)
-            .get('/')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Expires'))
-            .expect(200, function (err, res) {
-              if (err) return done(err);
-              request(server)
-                .get('/')
-                .set('Cookie', cookie(res))
-                .expect(shouldNotHaveHeader('Set-Cookie'))
-                .expect(200, done);
-            });
-        });
-
-        it('should not reset cookie when modified', function (_, done) {
-          const server = createServer(null, function (req, res) {
-            req.session.cookie.expires = null;
-            req.session.hit = (req.session.hit || 0) + 1;
-            res.end();
-          });
-
-          request(server)
-            .get('/')
-            .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Expires'))
-            .expect(200, function (err, res) {
-              if (err) return done(err);
-              request(server)
-                .get('/')
-                .set('Cookie', cookie(res))
-                .expect(shouldNotHaveHeader('Set-Cookie'))
-                .expect(200, done);
-            });
-        });
+  describe('when null', function () {
+    it('should be a browser-session cookie', async function () {
+      const server = createServer(null, function (req, res) {
+        req.session.cookie.expires = null;
+        res.end();
       });
+
+      const res = await fetch(server, '/').expectStatus(200);
+      shouldSetCookieWithoutAttribute('connect.sid', 'Expires')(res);
     });
 
-    describe('.partitioned', function () {
-      describe('by default', function () {
-        it('should not set partitioned attribute', function (_, done) {
-          const server = createServer();
-
-          request(server)
-            .get('/')
-            .expect(
-              shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')
-            )
-            .expect(200, done);
-        });
+    it('should not reset cookie', async function () {
+      const server = createServer(null, function (req, res) {
+        req.session.cookie.expires = null;
+        res.end();
       });
 
-      describe('when "false"', function () {
-        it('should not set partitioned attribute', function (_, done) {
-          const server = createServer({ cookie: { partitioned: false } });
+      const res = await fetch(server, '/').expect(200);
+      shouldSetCookieWithoutAttribute('connect.sid', 'Expires')(res);
 
-          request(server)
-            .get('/')
-            .expect(
-              shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')
-            )
-            .expect(200, done);
-        });
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+        .expect('Set-Cookie', null)
+        .expectStatus(200);
+    });
+
+    it('should not reset cookie when modified', async function () {
+      const server = createServer(null, function (req, res) {
+        req.session.cookie.expires = null;
+        req.session.hit = (req.session.hit || 0) + 1;
+        res.end();
       });
 
-      describe('when "true"', function () {
-        it('should set partitioned attribute', function (_, done) {
-          const server = createServer({ cookie: { partitioned: true } });
+      const res = await fetch(server, '/').expect(200);
+      shouldSetCookieWithoutAttribute('connect.sid', 'Expires')(res);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+        .expect('Set-Cookie', null)
+        .expectStatus(200);
+    });
+  });
+});
 
-          request(server)
-            .get('/')
-            .expect(shouldSetCookieWithAttribute('connect.sid', 'Partitioned'))
-            .expect(200, done);
-        });
-      });
+describe('.partitioned', function () {
+  describe('by default', function () {
+    it('should not set partitioned attribute', async function () {
+      const server = createServer();
+
+      const res = await fetch(server, '/').expectStatus(200);
+      shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')(res);
+    });
+  });
+
+  describe('when "false"', function () {
+    it('should not set partitioned attribute', async function () {
+      const server = createServer({ cookie: { partitioned: false } });
+
+      const res = await fetch(server, '/').expectStatus(200);
+      shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')(res);
+    });
+  });
+
+  describe('when "true"', function () {
+    it('should set partitioned attribute', async function () {
+      const server = createServer({ cookie: { partitioned: true } });
+
+      const res = await fetch(server, '/').expectStatus(200);
+      shouldSetCookieWithAttribute('connect.sid', 'Partitioned')(res);
     });
   });
 });
