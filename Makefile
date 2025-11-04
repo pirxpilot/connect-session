@@ -3,10 +3,13 @@ check: lint test
 lint:
 	./node_modules/.bin/biome ci
 
+format:
+	./node_modules/.bin/biome check --write
+
 test:
-	node --require ./test/support/env --test $(EXTRA_TEST_OPTIONS) test/*.js test/session/*.js
+	node --require ./test/support/env.js --test $(TEST_OPTS) test/*.js test/session/*.js
 
-test-coverage: export EXTRA_TEST_OPTIONS:=--experimental-test-coverage
-test-coverage: test
+test-cov: TEST_OPTS := --experimental-test-coverage
+test-cov: test
 
-.PHONY: check lint test test-coverage
+.PHONY: check lint format test test-cov
