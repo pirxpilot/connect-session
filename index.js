@@ -6,11 +6,6 @@
  * MIT Licensed
  */
 
-/**
- * Module dependencies.
- * @private
- */
-
 const Buffer = require('node:buffer').Buffer;
 const crypto = require('node:crypto');
 const debug = require('debug')('connect-session');
@@ -103,9 +98,7 @@ function session(options) {
   }
 
   if (saveUninitializedSession === undefined) {
-    deprecate(
-      'undefined saveUninitialized option; provide saveUninitialized option'
-    );
+    deprecate('undefined saveUninitialized option; provide saveUninitialized option');
     saveUninitializedSession = true;
   }
 
@@ -124,7 +117,7 @@ function session(options) {
   }
 
   // generates the new session
-  store.generate = function (req) {
+  store.generate = req => {
     req.sessionID = generateId(req);
     req.session = new Session(req);
     req.session.cookie = new Cookie(cookieOptions);
@@ -186,7 +179,7 @@ function session(options) {
     const cookieId = (req.sessionID = getcookie(req, name));
 
     // set-cookie
-    onHeaders(res, function () {
+    onHeaders(res, () => {
       if (!req.session) {
         debug('no session');
         return;
@@ -261,9 +254,7 @@ function session(options) {
 
         if (!Number.isNaN(contentLength) && contentLength > 0) {
           // measure chunk
-          chunk = !Buffer.isBuffer(chunk)
-            ? Buffer.from(chunk, encoding)
-            : chunk;
+          chunk = !Buffer.isBuffer(chunk) ? Buffer.from(chunk, encoding) : chunk;
           encoding = undefined;
 
           if (chunk.length !== 0) {
@@ -358,12 +349,12 @@ function session(options) {
     }
 
     function rewrapmethods(sess, callback) {
-      return function () {
+      return function (...args) {
         if (req.session !== sess) {
           wrapmethods(req.session);
         }
 
-        callback.apply(this, arguments);
+        callback.apply(this, args);
       };
     }
 
@@ -417,16 +408,11 @@ function session(options) {
     function shouldSave(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug(
-          'session ignored because of bogus req.sessionID %o',
-          req.sessionID
-        );
+        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
         return false;
       }
 
-      return !saveUninitializedSession &&
-        !savedHash &&
-        cookieId !== req.sessionID
+      return !saveUninitializedSession && !savedHash && cookieId !== req.sessionID
         ? isModified(req.session)
         : !isSaved(req.session);
     }
@@ -435,10 +421,7 @@ function session(options) {
     function shouldTouch(req) {
       // cannot set cookie without a session ID
       if (typeof req.sessionID !== 'string') {
-        debug(
-          'session ignored because of bogus req.sessionID %o',
-          req.sessionID
-        );
+        debug('session ignored because of bogus req.sessionID %o', req.sessionID);
         return false;
       }
 
@@ -454,8 +437,7 @@ function session(options) {
 
       return cookieId !== req.sessionID
         ? saveUninitializedSession || isModified(req.session)
-        : rollingSessions ||
-            (req.session.cookie.expires != null && isModified(req.session));
+        : rollingSessions || (req.session.cookie.expires != null && isModified(req.session));
     }
 
     // generate a session if the browser doesn't send a sessionID
@@ -468,7 +450,7 @@ function session(options) {
 
     // generate the session object
     debug('fetching %s', req.sessionID);
-    store.get(req.sessionID, function (err, sess) {
+    store.get(req.sessionID, (err, sess) => {
       // error handling
       if (err && err.code !== 'ENOENT') {
         debug('error %j', err);

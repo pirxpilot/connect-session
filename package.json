@@ -20,7 +20,7 @@
     "ufid": "^1.1.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "2.3.5",
     "@pirxpilot/connect": "~4",
     "cookie": "~1",
     "cookie-parser": "~1",

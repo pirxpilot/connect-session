@@ -5,10 +5,6 @@
  * MIT Licensed
  */
 
-/**
- * Module dependencies.
- */
-
 const deprecate = require('depd')('connect-session');
 
 /**
@@ -16,7 +12,6 @@ const deprecate = require('depd')('connect-session');
  *
  * @param {IncomingMessage} req
  * @param {Object} options
- * @api private
  */
 
 const Cookie = (module.exports = function Cookie(options) {
@@ -50,7 +45,6 @@ Cookie.prototype = {
    * Set expires `date`.
    *
    * @param {Date} date
-   * @api public
    */
 
   set expires(date) {
@@ -62,7 +56,6 @@ Cookie.prototype = {
    * Get expires `date`.
    *
    * @return {Date}
-   * @api public
    */
 
   get expires() {
@@ -73,7 +66,6 @@ Cookie.prototype = {
    * Set expires via max-age in `ms`.
    *
    * @param {Number} ms
-   * @api public
    */
 
   set maxAge(ms) {
@@ -92,20 +84,16 @@ Cookie.prototype = {
    * Get expires max-age in `ms`.
    *
    * @return {Number}
-   * @api public
    */
 
   get maxAge() {
-    return this.expires instanceof Date
-      ? this.expires.valueOf() - Date.now()
-      : this.expires;
+    return this.expires instanceof Date ? this.expires.valueOf() - Date.now() : this.expires;
   },
 
   /**
    * Return cookie data object.
    *
    * @return {Object}
-   * @api private
    */
 
   get data() {
@@ -126,7 +114,6 @@ Cookie.prototype = {
    * Return JSON representation of this cookie.
    *
    * @return {Object}
-   * @api private
    */
 
   toJSON() {

@@ -62,17 +62,17 @@ function writePatch(res) {
   const _write = res.write;
   let ended = false;
 
-  res.end = function end() {
+  res.end = function end(...args) {
     ended = true;
-    return _end.apply(this, arguments);
+    return _end.apply(this, args);
   };
 
-  res.write = function write() {
+  res.write = function write(...args) {
     if (ended) {
       throw new Error('write after end');
     }
 
-    return _write.apply(this, arguments);
+    return _write.apply(this, args);
   };
 }
 

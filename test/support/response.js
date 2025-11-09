@@ -22,7 +22,7 @@ function cookie(name, value, options = {}) {
     if (!secret) {
       throw new Error('cookieParser("secret") required for signed cookies');
     }
-    value = 's:' + sign(value, secret);
+    value = `s:${sign(value, secret)}`;
   }
 
   opts.path ??= '/';

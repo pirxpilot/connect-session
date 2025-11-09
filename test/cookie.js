@@ -2,52 +2,52 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const Cookie = require('../session/cookie');
 
-describe('new Cookie()', function () {
-  it('should create a new cookie object', function () {
+describe('new Cookie()', () => {
+  it('should create a new cookie object', () => {
     assert.strictEqual(typeof new Cookie(), 'object');
   });
 
-  it('should default expires to null', function () {
+  it('should default expires to null', () => {
     const cookie = new Cookie();
     assert.strictEqual(cookie.expires, null);
   });
 
-  it('should default httpOnly to true', function () {
+  it('should default httpOnly to true', () => {
     const cookie = new Cookie();
     assert.strictEqual(cookie.httpOnly, true);
   });
 
-  it('should default path to "/"', function () {
+  it('should default path to "/"', () => {
     const cookie = new Cookie();
     assert.strictEqual(cookie.path, '/');
   });
 
-  it('should default maxAge to null', function () {
+  it('should default maxAge to null', () => {
     const cookie = new Cookie();
     assert.strictEqual(cookie.maxAge, null);
   });
 
-  describe('with options', function () {
-    it('should create a new cookie object', function () {
+  describe('with options', () => {
+    it('should create a new cookie object', () => {
       assert.strictEqual(typeof new Cookie({}), 'object');
     });
 
-    it('should reject non-objects', function () {
-      assert.throws(function () {
+    it('should reject non-objects', () => {
+      assert.throws(() => {
         new Cookie(42);
       }, /argument options/);
-      assert.throws(function () {
+      assert.throws(() => {
         new Cookie('foo');
       }, /argument options/);
-      assert.throws(function () {
+      assert.throws(() => {
         new Cookie(true);
       }, /argument options/);
-      assert.throws(function () {
-        new Cookie(function () {});
+      assert.throws(() => {
+        new Cookie(() => {});
       }, /argument options/);
     });
 
-    it('should ignore "data" option', function () {
+    it('should ignore "data" option', () => {
       const cookie = new Cookie({ data: { foo: 'bar' }, path: '/foo' });
 
       assert.strictEqual(typeof cookie, 'object');
@@ -56,15 +56,15 @@ describe('new Cookie()', function () {
       assert.notStrictEqual(cookie.data.foo, 'bar');
     });
 
-    describe('expires', function () {
-      it('should set expires', function () {
+    describe('expires', () => {
+      it('should set expires', () => {
         const expires = new Date(Date.now() + 60000);
         const cookie = new Cookie({ expires });
 
         assert.strictEqual(cookie.expires, expires);
       });
 
-      it('should set maxAge', function () {
+      it('should set maxAge', () => {
         const expires = new Date(Date.now() + 60000);
         const cookie = new Cookie({ expires });
 
@@ -73,16 +73,16 @@ describe('new Cookie()', function () {
       });
     });
 
-    describe('httpOnly', function () {
-      it('should set httpOnly', function () {
+    describe('httpOnly', () => {
+      it('should set httpOnly', () => {
         const cookie = new Cookie({ httpOnly: false });
 
         assert.strictEqual(cookie.httpOnly, false);
       });
     });
 
-    describe('maxAge', function () {
-      it('should set expires', function () {
+    describe('maxAge', () => {
+      it('should set expires', () => {
         const maxAge = 60000;
         const cookie = new Cookie({ maxAge });
 
@@ -90,7 +90,7 @@ describe('new Cookie()', function () {
         assert.ok(cookie.expires.getTime() - Date.now() + 1000 >= maxAge);
       });
 
-      it('should set maxAge', function () {
+      it('should set maxAge', () => {
         const maxAge = 60000;
         const cookie = new Cookie({ maxAge });
 
@@ -99,7 +99,7 @@ describe('new Cookie()', function () {
         assert.ok(cookie.maxAge + 1000 >= maxAge);
       });
 
-      it('should accept Date object', function () {
+      it('should accept Date object', () => {
         const maxAge = new Date(Date.now() + 60000);
         const cookie = new Cookie({ maxAge });
 
@@ -108,37 +108,37 @@ describe('new Cookie()', function () {
         assert.ok(maxAge.getTime() - Date.now() + 1000 >= cookie.maxAge);
       });
 
-      it('should reject invalid types', function () {
-        assert.throws(function () {
+      it('should reject invalid types', () => {
+        assert.throws(() => {
           new Cookie({ maxAge: '42' });
         }, /maxAge/);
-        assert.throws(function () {
+        assert.throws(() => {
           new Cookie({ maxAge: true });
         }, /maxAge/);
-        assert.throws(function () {
+        assert.throws(() => {
           new Cookie({ maxAge() {} });
         }, /maxAge/);
       });
     });
 
-    describe('partitioned', function () {
-      it('should set partitioned', function () {
+    describe('partitioned', () => {
+      it('should set partitioned', () => {
         const cookie = new Cookie({ partitioned: true });
 
         assert.strictEqual(cookie.partitioned, true);
       });
     });
 
-    describe('path', function () {
-      it('should set path', function () {
+    describe('path', () => {
+      it('should set path', () => {
         const cookie = new Cookie({ path: '/foo' });
 
         assert.strictEqual(cookie.path, '/foo');
       });
     });
 
-    describe('priority', function () {
-      it('should set priority', function () {
+    describe('priority', () => {
+      it('should set priority', () => {
         const cookie = new Cookie({ priority: 'high' });
 
         assert.strictEqual(cookie.priority, 'high');
