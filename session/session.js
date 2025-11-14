@@ -5,10 +5,6 @@
  * MIT Licensed
  */
 
-/**
- * Expose Session.
- */
-
 module.exports = Session;
 
 /**
@@ -16,7 +12,6 @@ module.exports = Session;
  *
  * @param {IncomingRequest} req
  * @param {Object} data
- * @api private
  */
 
 function Session(req, data) {
@@ -39,7 +34,6 @@ function Session(req, data) {
  * session is still active.
  *
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'touch', function touch() {
@@ -50,7 +44,6 @@ defineMethod(Session.prototype, 'touch', function touch() {
  * Reset `.maxAge` to `.originalMaxAge`.
  *
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'resetMaxAge', function resetMaxAge() {
@@ -63,11 +56,10 @@ defineMethod(Session.prototype, 'resetMaxAge', function resetMaxAge() {
  *
  * @param {Function} fn
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'save', function save(fn) {
-  this.req.sessionStore.set(this.id, this, fn || function () {});
+  this.req.sessionStore.set(this.id, this, fn || (() => {}));
   return this;
 });
 
@@ -80,14 +72,13 @@ defineMethod(Session.prototype, 'save', function save(fn) {
  *
  * @param {Function} fn
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'reload', function reload(fn) {
   const req = this.req;
   const store = this.req.sessionStore;
 
-  store.get(this.id, function (err, sess) {
+  store.get(this.id, (err, sess) => {
     if (err) return fn(err);
     if (!sess) return fn(new Error('failed to load session'));
     store.createSession(req, sess);
@@ -101,7 +92,6 @@ defineMethod(Session.prototype, 'reload', function reload(fn) {
  *
  * @param {Function} fn
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'destroy', function destroy(fn) {
@@ -115,7 +105,6 @@ defineMethod(Session.prototype, 'destroy', function destroy(fn) {
  *
  * @param {Function} fn
  * @return {Session} for chaining
- * @api public
  */
 
 defineMethod(Session.prototype, 'regenerate', function regenerate(fn) {

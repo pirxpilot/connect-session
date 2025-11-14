@@ -6,17 +6,8 @@
  * MIT Licensed
  */
 
-/**
- * Module dependencies.
- * @private
- */
-
 const Store = require('./store');
 const util = require('node:util');
-
-/**
- * Module exports.
- */
 
 module.exports = MemoryStore;
 
@@ -117,7 +108,7 @@ MemoryStore.prototype.set = function set(sessionId, session, callback) {
  */
 
 MemoryStore.prototype.length = function length(callback) {
-  this.all(function (err, sessions) {
+  this.all((err, sessions) => {
     if (err) return callback(err);
     callback(null, Object.keys(sessions).length);
   });
@@ -160,10 +151,7 @@ function getSession(sessionId) {
   sess = JSON.parse(sess);
 
   if (sess.cookie) {
-    const expires =
-      typeof sess.cookie.expires === 'string'
-        ? new Date(sess.cookie.expires)
-        : sess.cookie.expires;
+    const expires = typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
 
     // destroy expired session
     if (expires && expires <= Date.now()) {

@@ -1,18 +1,14 @@
-const { before, describe, it } = require('node:test');
+const { before, describe, it, after } = require('node:test');
 const assert = require('node:assert');
-const request = require('supertest');
-const after = require('after');
-
+const { fetch } = require('supertest-fetch');
 const utils = require('../support/utils');
-const { cookie } = utils;
+const { cookie, storeLen } = utils;
 
 const session = require('../../');
 
 const {
   shouldSetSessionInStore,
-  shouldNotHaveHeader,
   shouldNotSetSessionInStore,
-  shouldSetCookie,
   shouldSetCookieToValue,
   shouldSetCookieWithAttribute,
   shouldSetCookieWithoutAttribute
@@ -22,71 +18,68 @@ const { createServer, mountAt } = require('../support/server');
 
 const min = 60 * 1000;
 
-describe('session options', function () {
-  describe('cookie option', function () {
-    describe('when "path" set to "/foo/bar"', function () {
+describe('session options', () => {
+  describe('cookie option', () => {
+    describe('when "path" set to "/foo/bar"', () => {
       const ctx = {};
 
-      before(function () {
+      before(() => {
         ctx.server = createServer({ cookie: { path: '/foo/bar' } });
       });
 
-      it('should not set cookie for "/" request', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, done);
+      after(() => {
+        ctx.server.close();
       });
 
-      it('should not set cookie for "http://foo/bar" request', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('host', 'http://foo/bar')
-          .expect(shouldNotHaveHeader('Set-Cookie'))
-          .expect(200, done);
+      it('should not set cookie for "/" request', async () => {
+        await fetch(ctx.server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
       });
 
-      it('should set cookie for "/foo/bar" request', function (_, done) {
-        request(ctx.server)
-          .get('/foo/bar/baz')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, done);
+      it('should not set cookie for "http://foo/bar" request', async () => {
+        await fetch(ctx.server, '/', { headers: { host: 'http://foo/bar' } })
+          .expectHeader('Set-Cookie', null)
+          .expectStatus(200);
       });
 
-      it('should set cookie for "/foo/bar/baz" request', function (_, done) {
-        request(ctx.server)
-          .get('/foo/bar/baz')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, done);
+      it('should set cookie for "/foo/bar" request', async () => {
+        await fetch(ctx.server, '/foo/bar/baz')
+          .expectHeader('Set-Cookie', /connect.sid/)
+          .expectStatus(200);
       });
 
-      describe('when mounted at "/foo"', function () {
-        before(function () {
+      it('should set cookie for "/foo/bar/baz" request', async () => {
+        await fetch(ctx.server, '/foo/bar/baz')
+          .expectHeader('Set-Cookie', /connect.sid/)
+          .expectStatus(200);
+      });
+
+      describe('when mounted at "/foo"', () => {
+        before(() => {
           ctx.server = createServer(mountAt('/foo'), {
             cookie: { path: '/foo/bar' }
           });
         });
 
-        it('should set cookie for "/foo/bar" request', function (_, done) {
-          request(ctx.server)
-            .get('/foo/bar')
-            .expect(shouldSetCookie('connect.sid'))
-            .expect(200, done);
+        after(() => {
+          ctx.server.close();
         });
 
-        it('should not set cookie for "/foo/foo/bar" request', function (_, done) {
-          request(ctx.server)
-            .get('/foo/foo/bar')
-            .expect(shouldNotHaveHeader('Set-Cookie'))
-            .expect(200, done);
+        it('should set cookie for "/foo/bar" request', async () => {
+          await fetch(ctx.server, '/foo/bar')
+            .expectHeader('Set-Cookie', /connect.sid/)
+            .expectStatus(200);
+        });
+
+        it('should not set cookie for "/foo/foo/bar" request', async () => {
+          await fetch(ctx.server, '/foo/foo/bar').expectHeader('Set-Cookie', null).expectStatus(200);
         });
       });
     });
 
-    describe('when "secure" set to "auto"', function () {
+    describe('when "secure" set to "auto"', () => {
       const ctx = {};
 
-      before(function () {
+      before(() => {
         function setup(req) {
           req.secure = JSON.parse(req.headers['x-secure']);
         }
@@ -95,164 +88,133 @@ describe('session options', function () {
           res.end(String(req.secure));
         }
 
-        ctx.server = createServer(
-          setup,
-          { cookie: { secure: 'auto' } },
-          respond
-        );
+        ctx.server = createServer(setup, { cookie: { secure: 'auto' } }, respond);
       });
 
-      it('should set secure if req.secure = true', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Secure', 'true')
-          .expect(shouldSetCookieWithAttribute('connect.sid', 'Secure'))
-          .expect(200, 'true', done);
+      it('should set secure if req.secure = true', async () => {
+        const check = shouldSetCookieWithAttribute('connect.sid', 'Secure');
+        const res = await fetch(ctx.server, '/', {
+          headers: { 'X-Secure': 'true' }
+        }).expect(200, 'true');
+        check(res);
       });
 
-      it('should not set secure if req.secure = false', function (_, done) {
-        request(ctx.server)
-          .get('/')
-          .set('X-Secure', 'false')
-          .expect(shouldSetCookieWithoutAttribute('connect.sid', 'Secure'))
-          .expect(200, 'false', done);
+      it('should not set secure if req.secure = false', async () => {
+        const check = shouldSetCookieWithoutAttribute('connect.sid', 'Secure');
+        const res = await fetch(ctx.server, '/', {
+          headers: { 'X-Secure': 'false' }
+        }).expect(200, 'false');
+        check(res);
       });
     });
   });
 
-  describe('genid option', function () {
-    it('should reject non-function values', function () {
+  describe('genid option', () => {
+    it('should reject non-function values', () => {
       assert.throws(session.bind(null, { genid: 'bogus!' }), /genid.*must/);
     });
 
-    it('should provide default generator', function (_, done) {
-      request(createServer())
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+    it('should provide default generator', async () => {
+      await fetch(createServer(), '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
     });
 
-    it('should allow custom function', function (_, done) {
+    it('should allow custom function', async () => {
       function genid() {
         return 'apple';
       }
 
-      request(createServer({ genid }))
-        .get('/')
-        .expect(
-          shouldSetCookieToValue(
-            'connect.sid',
-            's%3Aapple.D8Y%2BpkTAmeR0PobOhY4G97PRW%2Bj7bUnP%2F5m6%2FOn1MCU'
-          )
-        )
-        .expect(200, done);
+      const check = shouldSetCookieToValue(
+        'connect.sid',
+        's%3Aapple.D8Y%2BpkTAmeR0PobOhY4G97PRW%2Bj7bUnP%2F5m6%2FOn1MCU'
+      );
+
+      const res = await fetch(createServer({ genid }), '/').expectStatus(200);
+      check(res);
     });
 
-    it('should encode unsafe chars', function (_, done) {
+    it('should encode unsafe chars', async () => {
       function genid() {
         return '%';
       }
 
-      request(createServer({ genid }))
-        .get('/')
-        .expect(
-          shouldSetCookieToValue(
-            'connect.sid',
-            's%3A%25.kzQ6x52kKVdF35Qh62AWk4ZekS28K5XYCXKa%2FOTZ01g'
-          )
-        )
-        .expect(200, done);
+      const check = shouldSetCookieToValue('connect.sid', 's%3A%25.kzQ6x52kKVdF35Qh62AWk4ZekS28K5XYCXKa%2FOTZ01g');
+
+      const res = await fetch(createServer({ genid }), '/').expectStatus(200);
+      check(res);
     });
 
-    it('should provide req argument', function (_, done) {
+    it('should provide req argument', async () => {
       function genid(req) {
         return req.url;
       }
 
-      request(createServer({ genid }))
-        .get('/foo')
-        .expect(
-          shouldSetCookieToValue(
-            'connect.sid',
-            's%3A%2Ffoo.paEKBtAHbV5s1IB8B2zPnzAgYmmnRPIqObW4VRYj%2FMQ'
-          )
-        )
-        .expect(200, done);
+      const check = shouldSetCookieToValue('connect.sid', 's%3A%2Ffoo.paEKBtAHbV5s1IB8B2zPnzAgYmmnRPIqObW4VRYj%2FMQ');
+
+      const res = await fetch(createServer({ genid }), '/foo').expectStatus(200);
+      check(res);
     });
   });
 
-  describe('key option', function () {
-    it('should default to "connect.sid"', function (_, done) {
-      request(createServer())
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+  describe('key option', () => {
+    it('should default to "connect.sid"', async () => {
+      await fetch(createServer(), '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
     });
 
-    it('should allow overriding', function (_, done) {
-      request(createServer({ key: 'session_id' }))
-        .get('/')
-        .expect(shouldSetCookie('session_id'))
-        .expect(200, done);
+    it('should allow overriding', async () => {
+      await fetch(createServer({ key: 'session_id' }), '/')
+        .expectHeader('Set-Cookie', /session_id/)
+        .expectStatus(200);
     });
   });
 
-  describe('name option', function () {
-    it('should default to "connect.sid"', function (_, done) {
-      request(createServer())
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+  describe('name option', () => {
+    it('should default to "connect.sid"', async () => {
+      await fetch(createServer(), '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
     });
 
-    it('should set the cookie name', function (_, done) {
-      request(createServer({ name: 'session_id' }))
-        .get('/')
-        .expect(shouldSetCookie('session_id'))
-        .expect(200, done);
+    it('should set the cookie name', async () => {
+      await fetch(createServer({ name: 'session_id' }), '/')
+        .expectHeader('Set-Cookie', /session_id/)
+        .expectStatus(200);
     });
   });
 
-  describe('rolling option', function () {
-    it('should default to false', function (_, done) {
-      const server = createServer(null, function (req, res) {
+  describe('rolling option', () => {
+    it('should default to false', async () => {
+      const server = createServer(null, (req, res) => {
         req.session.user = 'bob';
         res.end();
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldNotHaveHeader('Set-Cookie'))
-            .expect(200, done);
-        });
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+        .expectHeader('Set-Cookie', null)
+        .expectStatus(200);
     });
 
-    it('should force cookie on unmodified session', function (_, done) {
-      const server = createServer({ rolling: true }, function (req, res) {
+    it('should force cookie on unmodified session', async () => {
+      const server = createServer({ rolling: true }, (req, res) => {
         req.session.user = 'bob';
         res.end();
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldSetCookie('connect.sid'))
-            .expect(200, done);
-        });
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
     });
 
-    it('should not force cookie on uninitialized session if saveUninitialized option is set to false', function (_, done) {
+    it('should not force cookie on uninitialized session if saveUninitialized option is set to false', async () => {
       const store = new session.MemoryStore();
       const server = createServer({
         store,
@@ -260,14 +222,12 @@ describe('session options', function () {
         saveUninitialized: false
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldNotSetSessionInStore(store))
-        .expect(shouldNotHaveHeader('Set-Cookie'))
-        .expect(200, done);
+      const check = shouldNotSetSessionInStore(store);
+      await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
+      check();
     });
 
-    it('should force cookie and save uninitialized session if saveUninitialized option is set to true', function (_, done) {
+    it('should force cookie and save uninitialized session if saveUninitialized option is set to true', async () => {
       const store = new session.MemoryStore();
       const server = createServer({
         store,
@@ -275,508 +235,389 @@ describe('session options', function () {
         saveUninitialized: true
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+      const check = shouldSetSessionInStore(store);
+      await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      check();
     });
 
-    it('should force cookie and save modified session even if saveUninitialized option is set to false', function (_, done) {
+    it('should force cookie and save modified session even if saveUninitialized option is set to false', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, rolling: true, saveUninitialized: false },
-        function (req, res) {
-          req.session.user = 'bob';
-          res.end();
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
-    });
-  });
-
-  describe('resave option', function () {
-    it('should default to true', function (_, done) {
-      const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store, rolling: true, saveUninitialized: false }, (req, res) => {
         req.session.user = 'bob';
         res.end();
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(shouldSetSessionInStore(store))
-            .expect(200, done);
+      const check = shouldSetSessionInStore(store);
+      await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      check();
+    });
+  });
+
+  describe('resave option', () => {
+    it('should default to true', async () => {
+      const store = new session.MemoryStore();
+      const server = createServer({ store }, (req, res) => {
+        req.session.user = 'bob';
+        res.end();
+      });
+
+      let check = shouldSetSessionInStore(store);
+      const res = await fetch(server, '/').expectStatus(200);
+      check();
+      check = shouldSetSessionInStore(store);
+      await fetch(server, '/', {
+        headers: { Cookie: cookie(res) }
+      }).expectStatus(200);
+      check();
+    });
+
+    describe('when true', () => {
+      it('should force save on unmodified session', async () => {
+        const store = new session.MemoryStore();
+        const server = createServer({ store, resave: true }, (req, res) => {
+          req.session.user = 'bob';
+          res.end();
         });
-    });
+        let check = shouldSetSessionInStore(store);
 
-    describe('when true', function () {
-      it('should force save on unmodified session', function (_, done) {
-        const store = new session.MemoryStore();
-        const server = createServer(
-          { store, resave: true },
-          function (req, res) {
-            req.session.user = 'bob';
-            res.end();
-          }
-        );
+        const res = await fetch(server, '/').expectStatus(200);
+        check();
+        check = shouldSetSessionInStore(store);
 
-        request(server)
-          .get('/')
-          .expect(shouldSetSessionInStore(store))
-          .expect(200, function (err, res) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetSessionInStore(store))
-              .expect(200, done);
-          });
+        await fetch(server, '/', {
+          headers: { Cookie: cookie(res) }
+        }).expectStatus(200);
+        check();
       });
     });
 
-    describe('when false', function () {
-      it('should prevent save on unmodified session', function (_, done) {
+    describe('when false', () => {
+      it('should prevent save on unmodified session', async () => {
         const store = new session.MemoryStore();
-        const server = createServer(
-          { store, resave: false },
-          function (req, res) {
-            req.session.user = 'bob';
-            res.end();
-          }
-        );
+        const server = createServer({ store, resave: false }, (req, res) => {
+          req.session.user = 'bob';
+          res.end();
+        });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetSessionInStore(store))
-          .expect(200, function (err, res) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldNotSetSessionInStore(store))
-              .expect(200, done);
-          });
+        let check = shouldSetSessionInStore(store);
+
+        const res = await fetch(server, '/').expectStatus(200);
+        check();
+        check = shouldNotSetSessionInStore(store);
+        await fetch(server, '/', {
+          headers: { Cookie: cookie(res) }
+        }).expectStatus(200);
+        check();
       });
 
-      it('should still save modified session', function (_, done) {
+      it('should still save modified session', async () => {
         const store = new session.MemoryStore();
-        const server = createServer(
-          { resave: false, store },
-          function (req, res) {
-            if (req.method === 'PUT') {
-              req.session.token = req.url.substr(1);
-            }
-            res.end('token=' + (req.session.token || ''));
-          }
-        );
 
-        request(server)
-          .put('/w6RHhwaA')
-          .expect(200)
-          .expect(shouldSetSessionInStore(store))
-          .expect('token=w6RHhwaA')
-          .end(function (err, res) {
-            if (err) return done(err);
-            const sess = cookie(res);
-            request(server)
-              .get('/')
-              .set('Cookie', sess)
-              .expect(200)
-              .expect(shouldNotSetSessionInStore(store))
-              .expect('token=w6RHhwaA')
-              .end(function (err) {
-                if (err) return done(err);
-                request(server)
-                  .put('/zfQ3rzM3')
-                  .set('Cookie', sess)
-                  .expect(200)
-                  .expect(shouldSetSessionInStore(store))
-                  .expect('token=zfQ3rzM3')
-                  .end(done);
-              });
-          });
+        const server = createServer({ resave: false, store }, (req, res) => {
+          if (req.method === 'PUT') {
+            req.session.token = req.url.substr(1);
+          }
+          res.end(`token=${req.session.token || ''}`);
+        });
+
+        let check = shouldSetSessionInStore(store);
+        const res = await fetch(server, '/w6RHhwaA', { method: 'PUT' }).expectStatus(200).expect('token=w6RHhwaA');
+        check();
+        const sess = cookie(res);
+
+        check = shouldNotSetSessionInStore(store);
+        await fetch(server, '/', { headers: { Cookie: sess } })
+          .expectStatus(200)
+          .expect('token=w6RHhwaA');
+        check();
+
+        check = shouldSetSessionInStore(store);
+        await fetch(server, '/zfQ3rzM3', {
+          method: 'PUT',
+          headers: { Cookie: sess }
+        })
+          .expectStatus(200)
+          .expect('token=zfQ3rzM3');
+        check();
       });
 
-      it('should detect a "cookie" property as modified', function (_, done) {
+      it('should detect a "cookie" property as modified', async () => {
         const store = new session.MemoryStore();
-        const server = createServer(
-          { store, resave: false },
-          function (req, res) {
-            req.session.user = req.session.user || {};
-            req.session.user.name = 'bob';
-            req.session.user.cookie = req.session.user.cookie || 0;
-            req.session.user.cookie++;
-            res.end();
-          }
-        );
+        const server = createServer({ store, resave: false }, (req, res) => {
+          req.session.user = req.session.user || {};
+          req.session.user.name = 'bob';
+          req.session.user.cookie = req.session.user.cookie || 0;
+          req.session.user.cookie++;
+          res.end();
+        });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetSessionInStore(store))
-          .expect(200, function (err, res) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetSessionInStore(store))
-              .expect(200, done);
-          });
+        let check = shouldSetSessionInStore(store);
+        const res = await fetch(server, '/').expectStatus(200);
+        check();
+
+        check = shouldSetSessionInStore(store);
+        await fetch(server, '/', {
+          headers: { Cookie: cookie(res) }
+        }).expectStatus(200);
+        check();
       });
 
-      it('should pass session touch error', function (_, done) {
-        const cb = after(2, done);
+      it('should pass session touch error', async () => {
         const store = new session.MemoryStore();
-        const server = createServer(
-          { store, resave: false },
-          function (req, res) {
-            req.session.hit = true;
-            res.end('session saved');
-          }
-        );
+        const server = createServer({ store, resave: false }, (req, res) => {
+          req.session.hit = true;
+          res.end('session saved');
+        });
 
-        store.touch = function touch(sid, sess, callback) {
+        store.touch = function touch(_sid, _sess, callback) {
           callback(new Error('boom!'));
         };
+
+        const { promise, resolve } = Promise.withResolvers();
 
         server.on('error', function onerror(err) {
           assert.ok(err);
           assert.strictEqual(err.message, 'boom!');
-          cb();
+          resolve();
         });
 
-        request(server)
-          .get('/')
-          .expect(200, 'session saved', function (err, res) {
-            if (err) return cb(err);
-            request(server).get('/').set('Cookie', cookie(res)).end(cb);
-          });
+        const res = await fetch(server, '/').expect(200, 'session saved');
+        await Promise.all([promise, await fetch(server, '/', { headers: { Cookie: cookie(res) } })]);
       });
     });
   });
 
-  describe('saveUninitialized option', function () {
-    it('should default to true', function (_, done) {
+  describe('saveUninitialized option', () => {
+    it('should default to true', async () => {
       const store = new session.MemoryStore();
       const server = createServer({ store });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+      const check = shouldSetSessionInStore(store);
+      await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      check();
     });
 
-    it('should force save of uninitialized session', function (_, done) {
+    it('should force save of uninitialized session', async () => {
       const store = new session.MemoryStore();
       const server = createServer({ store, saveUninitialized: true });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+      const check = shouldSetSessionInStore(store);
+      await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      check();
     });
 
-    it('should prevent save of uninitialized session', function (_, done) {
+    it('should prevent save of uninitialized session', async () => {
       const store = new session.MemoryStore();
       const server = createServer({ store, saveUninitialized: false });
 
-      request(server)
-        .get('/')
-        .expect(shouldNotSetSessionInStore(store))
-        .expect(shouldNotHaveHeader('Set-Cookie'))
-        .expect(200, done);
+      const check = shouldNotSetSessionInStore(store);
+      const res = await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
+      check(res);
     });
 
-    it('should still save modified session', function (_, done) {
+    it('should still save modified session', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, saveUninitialized: false },
-        function (req, res) {
-          req.session.count = req.session.count || 0;
-          req.session.count++;
-          res.end();
-        }
-      );
+      const server = createServer({ store, saveUninitialized: false }, (req, res) => {
+        req.session.count = req.session.count || 0;
+        req.session.count++;
+        res.end();
+      });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetSessionInStore(store))
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, done);
+      const check = shouldSetSessionInStore(store);
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expectStatus(200);
+      check(res);
     });
 
-    it('should pass session save error', function (_, done) {
-      const cb = after(2, done);
+    it('should pass session save error', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, saveUninitialized: true },
-        function (req, res) {
-          res.end('session saved');
-        }
-      );
+      const server = createServer({ store, saveUninitialized: true }, (_req, res) => {
+        res.end('session saved');
+      });
 
-      store.set = function destroy(sid, sess, callback) {
+      store.set = function destroy(_sid, _sess, callback) {
         callback(new Error('boom!'));
       };
 
+      const { promise, resolve } = Promise.withResolvers();
       server.on('error', function onerror(err) {
         assert.ok(err);
         assert.strictEqual(err.message, 'boom!');
-        cb();
+        resolve();
       });
 
-      request(server).get('/').expect(200, 'session saved', cb);
+      await Promise.all([fetch(server, '/').expect(200, 'session saved'), promise]);
     });
 
-    it('should prevent uninitialized session from being touched', function (_, done) {
+    it('should prevent uninitialized session from being touched', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { saveUninitialized: false, store, cookie: { maxAge: min } },
-        function (req, res) {
-          res.end();
-        }
-      );
+      const server = createServer({ saveUninitialized: false, store, cookie: { maxAge: min } }, (_req, res) => {
+        res.end();
+      });
 
-      store.touch = function () {
+      store.touch = () => {
         assert.fail('should not call touch');
       };
 
-      request(server).get('/').expect(200, done);
+      await fetch(server, '/').expectStatus(200);
     });
   });
 
-  describe('secret option', function () {
-    it('should sign and unsign with a string', function (_, done) {
-      const server = createServer(
-        { secret: 'awesome cat' },
-        function (req, res) {
-          if (!req.session.user) {
-            req.session.user = 'bob';
-            res.end('set');
-          } else {
-            res.end('get:' + JSON.stringify(req.session.user));
-          }
+  describe('secret option', () => {
+    it('should sign and unsign with a string', async () => {
+      const server = createServer({ secret: 'awesome cat' }, (req, res) => {
+        if (!req.session.user) {
+          req.session.user = 'bob';
+          res.end('set');
+        } else {
+          res.end(`get:${JSON.stringify(req.session.user)}`);
         }
-      );
+      });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'set', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(200, 'get:"bob"', done);
-        });
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect.sid/)
+        .expect(200, 'set');
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200, 'get:"bob"');
     });
 
-    describe('when an array', function () {
-      it('should sign cookies', function (_, done) {
-        const server = createServer(
-          { secret: ['keyboard cat', 'nyan cat'] },
-          function (req, res) {
-            req.session.user = 'bob';
-            res.end(req.session.user);
-          }
-        );
+    describe('when an array', () => {
+      it('should sign cookies', async () => {
+        const server = createServer({ secret: ['keyboard cat', 'nyan cat'] }, (req, res) => {
+          req.session.user = 'bob';
+          res.end(req.session.user);
+        });
 
-        request(server)
-          .get('/')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, 'bob', done);
+        await fetch(server, '/')
+          .expectHeader('Set-Cookie', /connect.sid/)
+          .expect(200, 'bob');
       });
 
-      it('should sign cookies with first element', function (_, done) {
+      it('should sign cookies with first element', async () => {
         const store = new session.MemoryStore();
 
-        const server1 = createServer(
-          { secret: ['keyboard cat', 'nyan cat'], store },
-          function (req, res) {
-            req.session.user = 'bob';
-            res.end(req.session.user);
-          }
-        );
+        const server1 = createServer({ secret: ['keyboard cat', 'nyan cat'], store }, (req, res) => {
+          req.session.user = 'bob';
+          res.end(req.session.user);
+        });
 
-        const server2 = createServer(
-          { secret: 'nyan cat', store },
-          function (req, res) {
-            res.end(String(req.session.user));
-          }
-        );
+        const server2 = createServer({ secret: 'nyan cat', store }, (req, res) => {
+          res.end(String(req.session.user));
+        });
 
-        request(server1)
-          .get('/')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, 'bob', function (err, res) {
-            if (err) return done(err);
-            request(server2)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(200, 'undefined', done);
-          });
+        const res = await fetch(server1, '/')
+          .expectHeader('Set-Cookie', /connect.sid/)
+          .expect(200, 'bob');
+
+        await fetch(server2, '/', { headers: { Cookie: cookie(res) } }).expect(200);
       });
 
-      it('should read cookies using all elements', function (_, done) {
+      it('should read cookies using all elements', async () => {
         const store = new session.MemoryStore();
 
-        const server1 = createServer(
-          { secret: 'nyan cat', store },
-          function (req, res) {
-            req.session.user = 'bob';
-            res.end(req.session.user);
-          }
-        );
+        const server1 = createServer({ secret: 'nyan cat', store }, (req, res) => {
+          req.session.user = 'bob';
+          res.end(req.session.user);
+        });
 
-        const server2 = createServer(
-          { secret: ['keyboard cat', 'nyan cat'], store },
-          function (req, res) {
-            res.end(String(req.session.user));
-          }
-        );
+        const server2 = createServer({ secret: ['keyboard cat', 'nyan cat'], store }, (req, res) => {
+          res.end(String(req.session.user));
+        });
 
-        request(server1)
-          .get('/')
-          .expect(shouldSetCookie('connect.sid'))
-          .expect(200, 'bob', function (err, res) {
-            if (err) return done(err);
-            request(server2)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(200, 'bob', done);
-          });
+        const res = await fetch(server1, '/')
+          .expectHeader('Set-Cookie', /connect.sid/)
+          .expect(200, 'bob');
+        await fetch(server2, '/', {
+          headers: {
+            Cookie: cookie(res)
+          }
+        }).expect(200, 'bob');
       });
     });
   });
 
-  describe('unset option', function () {
-    it('should reject unknown values', function () {
+  describe('unset option', () => {
+    it('should reject unknown values', () => {
       assert.throws(session.bind(null, { unset: 'bogus!' }), /unset.*must/);
     });
 
-    it('should default to keep', function (_, done) {
+    it('should default to keep', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store }, (req, res) => {
         req.session.count = req.session.count || 0;
         req.session.count++;
         if (req.session.count === 2) req.session = null;
         res.end();
       });
 
-      request(server)
-        .get('/')
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          store.length(function (err, len) {
-            if (err) return done(err);
-            assert.strictEqual(len, 1);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(200, function (err, res) {
-                if (err) return done(err);
-                store.length(function (err, len) {
-                  if (err) return done(err);
-                  assert.strictEqual(len, 1);
-                  done();
-                });
-              });
-          });
-        });
+      const res = await fetch(server, '/').expectStatus(200);
+      let len = await storeLen(store);
+      assert.strictEqual(len, 1);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200);
+      len = await storeLen(store);
+      assert.strictEqual(len, 1);
     });
 
-    it('should allow destroy on req.session = null', function (_, done) {
+    it('should allow destroy on req.session = null', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, unset: 'destroy' },
-        function (req, res) {
-          req.session.count = req.session.count || 0;
-          req.session.count++;
-          if (req.session.count === 2) req.session = null;
-          res.end();
-        }
-      );
+      const server = createServer({ store, unset: 'destroy' }, (req, res) => {
+        req.session.count = req.session.count || 0;
+        req.session.count++;
+        if (req.session.count === 2) req.session = null;
+        res.end();
+      });
 
-      request(server)
-        .get('/')
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          store.length(function (err, len) {
-            if (err) return done(err);
-            assert.strictEqual(len, 1);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(200, function (err, res) {
-                if (err) return done(err);
-                store.length(function (err, len) {
-                  if (err) return done(err);
-                  assert.strictEqual(len, 0);
-                  done();
-                });
-              });
-          });
-        });
+      const res = await fetch(server, '/').expectStatus(200);
+      let len = await storeLen(store);
+      assert.strictEqual(len, 1);
+
+      await fetch(server, '/', {
+        headers: { Cookie: cookie(res) }
+      }).expectStatus(200);
+      len = await storeLen(store);
+      assert.strictEqual(len, 0);
     });
 
-    it('should not set cookie if initial session destroyed', function (_, done) {
+    it('should not set cookie if initial session destroyed', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, unset: 'destroy' },
-        function (req, res) {
-          req.session = null;
-          res.end();
-        }
-      );
+      const server = createServer({ store, unset: 'destroy' }, (req, res) => {
+        req.session = null;
+        res.end();
+      });
 
-      request(server)
-        .get('/')
-        .expect(shouldNotHaveHeader('Set-Cookie'))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          store.length(function (err, len) {
-            if (err) return done(err);
-            assert.strictEqual(len, 0);
-            done();
-          });
-        });
+      const _res = await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
+
+      const len = await storeLen(store);
+      assert.strictEqual(len, 0);
     });
 
-    it('should pass session destroy error', function (_, done) {
-      const cb = after(2, done);
+    it('should pass session destroy error', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { store, unset: 'destroy' },
-        function (req, res) {
-          req.session = null;
-          res.end('session destroyed');
-        }
-      );
+      const server = createServer({ store, unset: 'destroy' }, (req, res) => {
+        req.session = null;
+        res.end('session destroyed');
+      });
 
-      store.destroy = function destroy(sid, callback) {
+      store.destroy = function destroy(_sid, callback) {
         callback(new Error('boom!'));
       };
 
+      const { promise, resolve } = Promise.withResolvers();
       server.on('error', function onerror(err) {
         assert.ok(err);
         assert.strictEqual(err.message, 'boom!');
-        cb();
+        resolve();
       });
 
-      request(server).get('/').expect(200, 'session destroyed', cb);
+      await Promise.all([fetch(server, '/').expect(200, 'session destroyed'), promise]);
     });
   });
 });

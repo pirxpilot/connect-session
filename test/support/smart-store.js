@@ -27,10 +27,7 @@ SmartStore.prototype.get = function get(sid, callback) {
 
   if (sess.cookie) {
     // expand expires into Date object
-    sess.cookie.expires =
-      typeof sess.cookie.expires === 'string'
-        ? new Date(sess.cookie.expires)
-        : sess.cookie.expires;
+    sess.cookie.expires = typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
 
     // destroy expired session
     if (sess.cookie.expires && sess.cookie.expires <= Date.now()) {

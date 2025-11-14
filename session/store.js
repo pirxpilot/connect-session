@@ -5,20 +5,10 @@
  * MIT Licensed
  */
 
-/**
- * Module dependencies.
- * @private
- */
-
 const Cookie = require('./cookie');
 const EventEmitter = require('node:events').EventEmitter;
 const Session = require('./session');
 const util = require('node:util');
-
-/**
- * Module exports.
- * @public
- */
 
 module.exports = Store;
 
@@ -42,13 +32,11 @@ util.inherits(Store, EventEmitter);
  *
  * @param {IncomingRequest} req
  * @return {Function} fn
- * @api public
  */
 
 Store.prototype.regenerate = function (req, fn) {
-  const self = this;
-  this.destroy(req.sessionID, function (err) {
-    self.generate(req);
+  this.destroy(req.sessionID, err => {
+    this.generate(req);
     fn(err);
   });
 };
@@ -59,16 +47,14 @@ Store.prototype.regenerate = function (req, fn) {
  *
  * @param {String} sid
  * @param {Function} fn
- * @api public
  */
 
 Store.prototype.load = function (sid, fn) {
-  const self = this;
-  this.get(sid, function (err, sess) {
+  this.get(sid, (err, sess) => {
     if (err) return fn(err);
     if (!sess) return fn();
-    const req = { sessionID: sid, sessionStore: self };
-    fn(null, self.createSession(req, sess));
+    const req = { sessionID: sid, sessionStore: this };
+    fn(null, this.createSession(req, sess));
   });
 };
 
@@ -78,10 +64,9 @@ Store.prototype.load = function (sid, fn) {
  * @param {IncomingRequest} req
  * @param {Object} sess
  * @return {Session}
- * @api private
  */
 
-Store.prototype.createSession = function (req, sess) {
+Store.prototype.createSession = (req, sess) => {
   const expires = sess.cookie.expires;
   const originalMaxAge = sess.cookie.originalMaxAge;
 

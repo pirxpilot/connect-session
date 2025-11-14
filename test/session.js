@@ -1,615 +1,509 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
-const after = require('after');
 const http = require('node:http');
-const request = require('supertest');
+const { fetch } = require('supertest-fetch');
 const session = require('../');
 const SyncStore = require('./support/sync-store');
 const utils = require('./support/utils');
-const { cookie } = utils;
+const { cookie, storeGet, storeLen, storeSet } = utils;
 
-const {
-  shouldSetSessionInStore,
-  shouldNotHaveHeader,
-  shouldSetCookie,
-  shouldSetCookieToDifferentSessionId
-} = require('./support/should');
+const { shouldSetSessionInStore, shouldSetCookieToDifferentSessionId } = require('./support/should');
 
 const { createServer } = require('./support/server');
+const timers = require('node:timers/promises');
 
 const min = 60 * 1000;
 
-describe('session()', function () {
-  it('should export constructors', function () {
+describe('session()', () => {
+  it('should export constructors', () => {
     assert.strictEqual(typeof session.Session, 'function');
     assert.strictEqual(typeof session.Store, 'function');
     assert.strictEqual(typeof session.MemoryStore, 'function');
   });
 
-  it('should do nothing if req.session exists', function (_, done) {
+  it('should do nothing if req.session exists', async () => {
     function setup(req) {
       req.session = {};
     }
 
-    request(createServer(setup))
-      .get('/')
-      .expect(shouldNotHaveHeader('Set-Cookie'))
-      .expect(200, done);
+    await fetch(createServer(setup), '/').expectHeader('set-cookie', null).expect(200);
   });
 
-  it('should error without secret', function (_, done) {
-    request(createServer({ secret: false }))
-      .get('/')
-      .expect(500, /secret.*required/, done);
+  it('should error without secret', async () => {
+    const server = createServer({ secret: false });
+    await fetch(server, '/').expect(500, /secret.*required/);
   });
 
-  it('should get secret from req.secret', function (_, done) {
+  it('should get secret from req.secret', async () => {
     function setup(req) {
       req.secret = 'keyboard cat';
     }
 
-    request(createServer(setup)).get('/').expect(200, '', done);
+    const server = createServer(setup);
+    await fetch(server, '/').expectStatus(200).expectBody('');
   });
 
-  it('should create a new session', function (_, done) {
+  it('should create a new session', async () => {
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
+    const server = createServer({ store }, (req, res) => {
       req.session.active = true;
       res.end('session active');
     });
 
-    request(server)
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, 'session active', function (err, res) {
-        if (err) return done(err);
-        store.length(function (err, len) {
-          if (err) return done(err);
-          assert.strictEqual(len, 1);
-          done();
-        });
-      });
+    await fetch(server, '/')
+      .expectHeader('set-cookie', /connect.sid/)
+      .expectStatus(200)
+      .expectBody('session active');
+
+    const len = await storeLen(store);
+    assert.strictEqual(len, 1);
   });
 
-  it('should load session from cookie sid', function (_, done) {
+  it('should load session from cookie sid', async () => {
     let count = 0;
-    const server = createServer(null, function (req, res) {
-      req.session.num = req.session.num || ++count;
-      res.end('session ' + req.session.num);
+    const server = createServer(null, (req, res) => {
+      req.session.num ??= ++count;
+      res.end(`session ${req.session.num}`);
     });
 
-    request(server)
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, 'session 1', function (err, res) {
-        if (err) return done(err);
-        request(server)
-          .get('/')
-          .set('Cookie', cookie(res))
-          .expect(200, 'session 1', done);
-      });
+    const res = await fetch(server, '/')
+      .expectHeader('set-cookie', /connect.sid/)
+      .expectStatus(200)
+      .expectBody('session 1');
+
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+      .expectStatus(200)
+      .expectBody('session 1');
   });
 
-  it('should pass session fetch error', function (_, done) {
+  it('should pass session fetch error', async () => {
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
+    const server = createServer({ store }, (_req, res) => {
       res.end('hello, world');
     });
 
-    store.get = function destroy(sid, callback) {
+    store.get = function destroy(_sid, callback) {
       callback(new Error('boom!'));
     };
 
-    request(server)
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, 'hello, world', function (err, res) {
-        if (err) return done(err);
-        request(server)
-          .get('/')
-          .set('Cookie', cookie(res))
-          .expect(500, 'boom!', done);
-      });
+    const res = await fetch(server, '/')
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expectStatus(200)
+      .expectBody('hello, world');
+
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+      .expectStatus(500)
+      .expectBody('boom!');
   });
 
-  it('should treat ENOENT session fetch error as not found', function (_, done) {
+  it('should treat ENOENT session fetch error as not found', async () => {
     let count = 0;
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
-      req.session.num = req.session.num || ++count;
-      res.end('session ' + req.session.num);
+    const server = createServer({ store }, (req, res) => {
+      req.session.num ??= ++count;
+      res.end(`session ${req.session.num}`);
     });
 
-    store.get = function destroy(sid, callback) {
+    store.get = function destroy(_sid, callback) {
       const err = new Error('boom!');
       err.code = 'ENOENT';
       callback(err);
     };
 
-    request(server)
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, 'session 1', function (err, res) {
-        if (err) return done(err);
-        request(server)
-          .get('/')
-          .set('Cookie', cookie(res))
-          .expect(200, 'session 2', done);
-      });
+    const res = await fetch(server, '/')
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expectStatus(200)
+      .expectBody('session 1');
+
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expectStatus(200)
+      .expectBody('session 2');
   });
 
-  it('should create multiple sessions', function (_, done) {
-    const cb = after(2, check);
+  it('should create multiple sessions', async () => {
     let count = 0;
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
+    const server = createServer({ store }, (req, res) => {
       const isnew = req.session.num === undefined;
-      req.session.num = req.session.num || ++count;
-      res.end('session ' + (isnew ? 'created' : 'updated'));
+      req.session.num ??= ++count;
+      res.end(`session ${isnew ? 'created' : 'updated'}`);
     });
 
-    function check(err) {
-      if (err) return done(err);
-      store.all(function (err, sess) {
-        if (err) return done(err);
-        assert.strictEqual(Object.keys(sess).length, 2);
-        done();
-      });
-    }
+    await Promise.all([
+      fetch(server, '/').expectStatus(200).expectBody('session created'),
+      fetch(server, '/').expectStatus(200).expectBody('session created')
+    ]);
 
-    request(server).get('/').expect(200, 'session created', cb);
-
-    request(server).get('/').expect(200, 'session created', cb);
+    const len = await storeLen(store);
+    assert.strictEqual(len, 2);
   });
 
-  it('should handle empty req.url', function (_, done) {
+  it('should handle empty req.url', async () => {
     function setup(req) {
       req.url = '';
     }
 
-    request(createServer(setup))
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, done);
+    const server = createServer(setup);
+    await fetch(server, '/')
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expect(200);
   });
 
-  it('should handle multiple res.end calls', function (_, done) {
-    const server = createServer(null, function (req, res) {
+  it('should handle multiple res.end calls', async () => {
+    const server = createServer(null, (_req, res) => {
       res.setHeader('Content-Type', 'text/plain');
       res.end('Hello, world!');
       res.end();
     });
 
-    request(server)
-      .get('/')
-      .expect('Content-Type', 'text/plain')
-      .expect(200, 'Hello, world!', done);
+    await fetch(server, '/').expect('Content-Type', 'text/plain').expectStatus(200).expectBody('Hello, world!');
   });
 
-  it('should handle res.end(null) calls', function (_, done) {
-    const server = createServer(null, function (req, res) {
+  it('should handle res.end(null) calls', async () => {
+    const server = createServer(null, (_req, res) => {
       res.end(null);
     });
 
-    request(server).get('/').expect(200, '', done);
+    await fetch(server, '/').expectStatus(200).expectBody('');
   });
 
-  it('should handle reserved properties in storage', function (_, done) {
+  it('should handle reserved properties in storage', async () => {
     let count = 0;
     let sid;
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
+    const server = createServer({ store }, (req, res) => {
       sid = req.session.id;
-      req.session.num = req.session.num || ++count;
+      req.session.num ??= ++count;
       res.end('session saved');
     });
 
-    request(server)
-      .get('/')
-      .expect(200, 'session saved', function (err, res) {
-        if (err) return done(err);
-        store.get(sid, function (err, sess) {
-          if (err) return done(err);
-          // save is reserved
-          sess.save = 'nope';
-          store.set(sid, sess, function (err) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(200, 'session saved', done);
-          });
-        });
-      });
+    const res = await fetch(server, '/').expectStatus(200).expectBody('session saved');
+    const sess = await storeGet(store, sid);
+    // save is reserved
+    sess.save = 'nope';
+    await storeSet(store, sid, sess);
+    await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+      .expectStatus(200)
+      .expectBody('session saved');
   });
 
-  it('should only have session data enumerable (and cookie)', function (_, done) {
-    const server = createServer(null, function (req, res) {
+  it('should only have session data enumerable (and cookie)', async () => {
+    const server = createServer(null, (req, res) => {
       req.session.test1 = 1;
       req.session.test2 = 'b';
       res.end(Object.keys(req.session).sort().join(','));
     });
 
-    request(server).get('/').expect(200, 'cookie,test1,test2', done);
+    await fetch(server, '/').expectStatus(200).expectBody('cookie,test1,test2');
   });
 
-  it('should not save with bogus req.sessionID', function (_, done) {
+  it('should not save with bogus req.sessionID', async () => {
     const store = new session.MemoryStore();
-    const server = createServer({ store }, function (req, res) {
-      req.sessionID = function () {};
+    const server = createServer({ store }, (req, res) => {
+      req.sessionID = () => {};
       req.session.test1 = 1;
       req.session.test2 = 'b';
       res.end();
     });
 
-    request(server)
-      .get('/')
-      .expect(shouldNotHaveHeader('Set-Cookie'))
-      .expect(200, function (err) {
-        if (err) return done(err);
-        store.length(function (err, length) {
-          if (err) return done(err);
-          assert.strictEqual(length, 0);
-          done();
-        });
-      });
+    await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
+
+    const len = await storeLen(store);
+    assert.strictEqual(len, 0);
   });
 
-  it('should update cookie expiration when slow write', function (_, done) {
-    const server = createServer({ rolling: true }, function (req, res) {
+  it('should update cookie expiration when slow write', async () => {
+    const server = createServer({ rolling: true }, (req, res) => {
       req.session.user = 'bob';
       res.write('hello, ');
-      setTimeout(function () {
+      setTimeout(() => {
         res.end('world!');
       }, 200);
     });
 
-    request(server)
-      .get('/')
-      .expect(shouldSetCookie('connect.sid'))
-      .expect(200, function (err, res) {
-        if (err) return done(err);
-        const originalExpires = utils.expires(res);
-        setTimeout(
-          function () {
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetCookie('connect.sid'))
-              .expect(function (res) {
-                assert.notStrictEqual(originalExpires, utils.expires(res));
-              })
-              .expect(200, done);
-          },
-          1000 - (Date.now() % 1000) + 200
-        );
-      });
+    const res = await fetch(server, '/')
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expect(200);
+
+    const originalExpires = utils.expires(res);
+    await timers.setTimeout(1000 - (Date.now() % 1000) + 200);
+
+    const res2 = await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+      .expectHeader('Set-Cookie', /connect\.sid/)
+      .expect(200);
+
+    assert.notEqual(originalExpires, utils.expires(res2));
   });
 
-  describe('when response ended', function () {
-    it('should have saved session', function (_, done) {
+  describe('when response ended', () => {
+    it('should have saved session', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
         res.end('session saved');
       });
 
-      request(server)
-        .get('/')
-        .expect(200)
-        .expect(shouldSetSessionInStore(store, 200))
-        .expect('session saved')
-        .end(done);
+      const checkSession = shouldSetSessionInStore(store, 200);
+      const res = await fetch(server, '/').expectStatus(200).expectBody('session saved');
+
+      checkSession(res);
     });
 
-    it('should have saved session even with empty response', function (_, done) {
+    it('should have saved session even with empty response', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
         res.setHeader('Content-Length', '0');
         res.end();
       });
 
-      request(server)
-        .get('/')
-        .expect(200)
-        .expect(shouldSetSessionInStore(store, 200))
-        .end(done);
+      const checkSession = shouldSetSessionInStore(store, 200);
+      const res = await fetch(server, '/').expectStatus(200);
+
+      checkSession(res);
     });
 
-    it('should have saved session even with multi-write', function (_, done) {
+    it('should have saved session even with multi-write', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
         res.setHeader('Content-Length', '12');
         res.write('hello, ');
         res.end('world');
       });
 
-      request(server)
-        .get('/')
-        .expect(200)
-        .expect(shouldSetSessionInStore(store, 200))
-        .expect('hello, world')
-        .end(done);
+      const checkSession = shouldSetSessionInStore(store, 200);
+      const res = await fetch(server, '/').expectStatus(200).expectBody('hello, world');
+
+      checkSession(res);
     });
 
-    it('should have saved session even with non-chunked response', function (_, done) {
+    it('should have saved session even with non-chunked response', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
+      const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
         res.setHeader('Content-Length', '13');
         res.end('session saved');
       });
 
-      request(server)
-        .get('/')
-        .expect(200)
-        .expect(shouldSetSessionInStore(store, 200))
-        .expect('session saved')
-        .end(done);
+      const checkSession = shouldSetSessionInStore(store, 200);
+      const res = await fetch(server, '/').expectStatus(200).expectBody('session saved');
+      checkSession(res);
     });
 
-    it('should have saved session with updated cookie expiration', function (_, done) {
+    it('should have saved session with updated cookie expiration', async () => {
       const store = new session.MemoryStore();
-      const server = createServer(
-        { cookie: { maxAge: min }, store },
-        function (req, res) {
-          req.session.user = 'bob';
-          res.end(req.session.id);
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, function (err, res) {
-          if (err) return done(err);
-          const id = res.text;
-          store.get(id, function (err, sess) {
-            if (err) return done(err);
-            assert.ok(sess, 'session saved to store');
-            const exp = new Date(sess.cookie.expires);
-            assert.strictEqual(exp.toUTCString(), utils.expires(res));
-            setTimeout(
-              function () {
-                request(server)
-                  .get('/')
-                  .set('Cookie', cookie(res))
-                  .expect(200, function (err, res) {
-                    if (err) return done(err);
-                    store.get(id, function (err, sess) {
-                      if (err) return done(err);
-                      assert.strictEqual(res.text, id);
-                      assert.ok(sess, 'session still in store');
-                      assert.notStrictEqual(
-                        new Date(sess.cookie.expires).toUTCString(),
-                        exp.toUTCString(),
-                        'session cookie expiration updated'
-                      );
-                      done();
-                    });
-                  });
-              },
-              1000 - (Date.now() % 1000) + 200
-            );
-          });
-        });
-    });
-  });
-
-  describe('when session expired in store', function () {
-    it('should create a new session', function (_, done) {
-      let count = 0;
-      const store = new session.MemoryStore();
-      const server = createServer(
-        { store, cookie: { maxAge: 5 } },
-        function (req, res) {
-          req.session.num = req.session.num || ++count;
-          res.end('session ' + req.session.num);
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'session 1', function (err, res) {
-          if (err) return done(err);
-          setTimeout(function () {
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetCookie('connect.sid'))
-              .expect(200, 'session 2', done);
-          }, 20);
-        });
-    });
-
-    it('should have a new sid', function (_, done) {
-      let count = 0;
-      const store = new session.MemoryStore();
-      const server = createServer(
-        { store, cookie: { maxAge: 5 } },
-        function (req, res) {
-          req.session.num = req.session.num || ++count;
-          res.end('session ' + req.session.num);
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'session 1', function (err, res) {
-          if (err) return done(err);
-          setTimeout(function () {
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(shouldSetCookie('connect.sid'))
-              .expect(shouldSetCookieToDifferentSessionId(utils.sid(res)))
-              .expect(200, 'session 2', done);
-          }, 15);
-        });
-    });
-
-    it('should not exist in store', function (_, done) {
-      let count = 0;
-      const store = new session.MemoryStore();
-      const server = createServer(
-        { store, cookie: { maxAge: 5 } },
-        function (req, res) {
-          req.session.num = req.session.num || ++count;
-          res.end('session ' + req.session.num);
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'session 1', function (err, res) {
-          if (err) return done(err);
-          setTimeout(function () {
-            store.all(function (err, sess) {
-              if (err) return done(err);
-              assert.strictEqual(Object.keys(sess).length, 0);
-              done();
-            });
-          }, 10);
-        });
-    });
-  });
-
-  describe('when session without cookie property in store', function () {
-    it('should pass error from inflate', function (_, done) {
-      let count = 0;
-      const store = new session.MemoryStore();
-      const server = createServer({ store }, function (req, res) {
-        req.session.num = req.session.num || ++count;
-        res.end('session ' + req.session.num);
+      const server = createServer({ cookie: { maxAge: min }, store }, (req, res) => {
+        req.session.user = 'bob';
+        res.end(req.session.id);
       });
 
-      request(server)
-        .get('/')
-        .expect(shouldSetCookie('connect.sid'))
-        .expect(200, 'session 1', function (err, res) {
-          if (err) return done(err);
-          store.set(utils.sid(res), { foo: 'bar' }, function (err) {
-            if (err) return done(err);
-            request(server)
-              .get('/')
-              .set('Cookie', cookie(res))
-              .expect(500, /Cannot read prop/, done);
-          });
-        });
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expect(200);
+
+      const id = await res.text();
+      const sess = await storeGet(store, id);
+      assert.ok(sess, 'session saved to store');
+      const exp = new Date(sess.cookie.expires);
+      assert.strictEqual(exp.toUTCString(), utils.expires(res));
+
+      await timers.setTimeout(1000 - (Date.now() % 1000) + 200);
+
+      const res2 = await fetch(server, '/', {
+        headers: { Cookie: cookie(res) }
+      }).expect(200);
+
+      assert.strictEqual(await res2.text(), id);
+      const sess2 = await storeGet(store, id);
+
+      assert.ok(sess2, 'session still in store');
+      assert.notEqual(
+        new Date(sess2.cookie.expires).toUTCString(),
+        exp.toUTCString(),
+        'session cookie expiration updated'
+      );
     });
   });
 
-  describe('res.end patch', function () {
-    it('should correctly handle res.end/res.write patched prior', function (_, done) {
-      function setup(req, res) {
-        utils.writePatch(res);
-      }
-
-      function respond(req, res) {
-        req.session.hit = true;
-        res.write('hello, ');
-        res.end('world');
-      }
-
-      request(createServer(setup, null, respond))
-        .get('/')
-        .expect(200, 'hello, world', done);
-    });
-
-    it('should correctly handle res.end/res.write patched after', function (_, done) {
-      function respond(req, res) {
-        utils.writePatch(res);
-        req.session.hit = true;
-        res.write('hello, ');
-        res.end('world');
-      }
-
-      request(createServer(null, respond))
-        .get('/')
-        .expect(200, 'hello, world', done);
-    });
-
-    it('should error when res.end is called twice', function (_, done) {
-      let error1 = null;
-      let error2 = null;
-      const server = http.createServer(function (req, res) {
-        res.end();
-
-        try {
-          res.setHeader('Content-Length', '3');
-          res.end('foo');
-        } catch (e) {
-          error1 = e;
-        }
+  describe('when session expired in store', () => {
+    it('should create a new session', async () => {
+      let count = 0;
+      const store = new session.MemoryStore();
+      const server = createServer({ store, cookie: { maxAge: 5 } }, (req, res) => {
+        req.session.num ??= ++count;
+        res.end(`session ${req.session.num}`);
       });
 
-      function respond(req, res) {
-        res.end();
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 1');
+      await timers.setTimeout(20);
 
-        try {
-          res.setHeader('Content-Length', '3');
-          res.end('foo');
-        } catch (e) {
-          error2 = e;
-        }
-      }
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } })
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 2');
+    });
 
-      request(server)
-        .get('/')
-        .end(function (err, res) {
-          if (err) return done(err);
-          request(createServer(null, respond))
-            .get('/')
-            .expect(function () {
-              assert.strictEqual(error1?.message, error2?.message);
-            })
-            .expect(res.statusCode, res.text, done);
-        });
+    it('should have a new sid', async () => {
+      let count = 0;
+      const store = new session.MemoryStore();
+      const server = createServer({ store, cookie: { maxAge: 5 } }, (req, res) => {
+        req.session.num ??= ++count;
+        res.end(`session ${req.session.num}`);
+      });
+
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 1');
+
+      await timers.setTimeout(15);
+      const res2 = await fetch(server, '/', {
+        headers: { Cookie: cookie(res) }
+      })
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 2');
+
+      shouldSetCookieToDifferentSessionId(utils.sid(res))(res2);
+    });
+
+    it('should not exist in store', async () => {
+      let count = 0;
+      const store = new session.MemoryStore();
+      const server = createServer({ store, cookie: { maxAge: 5 } }, (req, res) => {
+        req.session.num ??= ++count;
+        res.end(`session ${req.session.num}`);
+      });
+
+      const _res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 1');
+      await timers.setTimeout(10);
+
+      const len = await storeLen(store);
+      assert.strictEqual(len, 0);
     });
   });
 
-  describe('synchronous store', function () {
-    it('should respond correctly on save', function (_, done) {
-      const store = new SyncStore();
-      const server = createServer({ store }, function (req, res) {
-        req.session.count = req.session.count || 0;
-        req.session.count++;
-        res.end('hits: ' + req.session.count);
+  describe('when session without cookie property in store', () => {
+    it('should pass error from inflate', async () => {
+      let count = 0;
+      const store = new session.MemoryStore();
+      const server = createServer({ store }, (req, res) => {
+        req.session.num ??= ++count;
+        res.end(`session ${req.session.num}`);
       });
 
-      request(server).get('/').expect(200, 'hits: 1', done);
+      const res = await fetch(server, '/')
+        .expectHeader('Set-Cookie', /connect\.sid/)
+        .expectStatus(200)
+        .expectBody('session 1');
+
+      await storeSet(store, utils.sid(res), { foo: 'bar' });
+
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(500, /Cannot read prop/);
     });
 
-    it('should respond correctly on destroy', function (_, done) {
-      const store = new SyncStore();
-      const server = createServer(
-        { store, unset: 'destroy' },
-        function (req, res) {
-          req.session.count = req.session.count || 0;
+    describe('res.end patch', () => {
+      it('should correctly handle res.end/res.write patched prior', async () => {
+        function setup(_req, res) {
+          utils.writePatch(res);
+        }
+
+        function respond(req, res) {
+          req.session.hit = true;
+          res.write('hello, ');
+          res.end('world');
+        }
+
+        const server = createServer(setup, null, respond);
+        await fetch(server, '/').expectStatus(200).expectBody('hello, world');
+      });
+
+      it('should correctly handle res.end/res.write patched after', async () => {
+        function respond(req, res) {
+          utils.writePatch(res);
+          req.session.hit = true;
+          res.write('hello, ');
+          res.end('world');
+        }
+        const server = createServer(null, respond);
+        await fetch(server, '/').expectStatus(200).expectBody('hello, world');
+      });
+
+      it('should error when res.end is called twice', async () => {
+        let error1 = null;
+        let error2 = null;
+        const server = http.createServer((_req, res) => {
+          res.end();
+
+          try {
+            res.setHeader('Content-Length', '3');
+            res.end('foo');
+          } catch (e) {
+            error1 = e;
+          }
+        });
+
+        function respond(_req, res) {
+          res.end();
+
+          try {
+            res.setHeader('Content-Length', '3');
+            res.end('foo');
+          } catch (e) {
+            error2 = e;
+          }
+        }
+
+        await fetch(server, '/').expectStatus(200).expectBody('');
+        assert.ok(error1 instanceof Error);
+
+        await fetch(createServer(null, respond), '/').expectStatus(200).expectBody('');
+        assert.ok(error2 instanceof Error);
+
+        assert.strictEqual(error1.message, error2.message);
+      });
+    });
+
+    describe('synchronous store', () => {
+      it('should respond correctly on save', async () => {
+        const store = new SyncStore();
+        const server = createServer({ store }, (req, res) => {
+          req.session.count ??= 0;
+          req.session.count++;
+          res.end(`hits: ${req.session.count}`);
+        });
+
+        await fetch(server, '/').expectStatus(200).expectBody('hits: 1');
+      });
+
+      it('should respond correctly on destroy', async () => {
+        const store = new SyncStore();
+        const server = createServer({ store, unset: 'destroy' }, (req, res) => {
+          req.session.count ??= 0;
           const count = ++req.session.count;
-          if (req.session.count > 1) {
+          if (count > 1) {
             req.session = null;
             res.write('destroyed\n');
           }
-          res.end('hits: ' + count);
-        }
-      );
-
-      request(server)
-        .get('/')
-        .expect(200, 'hits: 1', function (err, res) {
-          if (err) return done(err);
-          request(server)
-            .get('/')
-            .set('Cookie', cookie(res))
-            .expect(200, 'destroyed\nhits: 2', done);
+          res.end(`hits: ${count}`);
         });
+
+        const res = await fetch(server, '/').expectStatus(200).expectBody('hits: 1');
+        await fetch(server, '/', {
+          headers: { cookie: cookie(res) }
+        })
+          .expectStatus(200)
+          .expectBody('destroyed\nhits: 2');
+      });
     });
   });
 });
