@@ -1,4 +1,11 @@
 
+3.0.1 / 2025-11-14
+==================
+
+ * replace `supertest` with `supertest-fetch`
+ * update github actions
+ * use biome as a linter
+
 3.0.0 / 2025-01-14
 ==================
 
