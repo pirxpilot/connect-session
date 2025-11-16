@@ -79,7 +79,7 @@ describe('session()', () => {
 
   it('should pass session fetch error', async () => {
     const store = new session.MemoryStore();
-    const server = createServer({ store }, (_req, res) => {
+    const server = createServer({ store, saveUninitialized: true }, (_req, res) => {
       res.end('hello, world');
     });
 
@@ -145,7 +145,7 @@ describe('session()', () => {
       req.url = '';
     }
 
-    const server = createServer(setup);
+    const server = createServer(setup, { saveUninitialized: true });
     await fetch(server, '/')
       .expectHeader('Set-Cookie', /connect\.sid/)
       .expect(200);

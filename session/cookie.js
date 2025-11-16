@@ -5,8 +5,6 @@
  * MIT Licensed
  */
 
-const deprecate = require('depd')('connect-session');
-
 /**
  * Initialize a new `Cookie` with the given `options`.
  *
@@ -71,10 +69,6 @@ Cookie.prototype = {
   set maxAge(ms) {
     if (ms && typeof ms !== 'number' && !(ms instanceof Date)) {
       throw new TypeError('maxAge must be a number or Date');
-    }
-
-    if (ms instanceof Date) {
-      deprecate('maxAge as Date; pass number of milliseconds instead');
     }
 
     this.expires = typeof ms === 'number' ? new Date(Date.now() + ms) : ms;

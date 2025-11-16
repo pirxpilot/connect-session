@@ -7,7 +7,7 @@ format:
 	./node_modules/.bin/biome check --write
 
 test:
-	node --require ./test/support/env.js --test $(TEST_OPTS) test/*.js test/session/*.js
+	node --test $(TEST_OPTS) test/*.js test/session/*.js
 
 test-cov: TEST_OPTS := --experimental-test-coverage
 test-cov: test

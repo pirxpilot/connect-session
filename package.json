@@ -14,7 +14,6 @@
   "license": "MIT",
   "dependencies": {
     "debug": "~4",
-    "depd": "~2",
     "on-headers": "~1",
     "parseurl": "~1",
     "ufid": "^1.1.2"

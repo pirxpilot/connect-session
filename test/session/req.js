@@ -164,7 +164,7 @@ describe('req.session', () => {
 
         fetch(server, '/bar', { headers: { Cookie: val } })
           .expect(200, 'saw /bar')
-          .then(_resp => {
+          .then(() => {
             req.session.reload(() => {
               res.end(`saw ${req.session.url}`);
             });
@@ -335,7 +335,7 @@ describe('req.session', () => {
   describe('.cookie', () => {
     describe('.*', () => {
       it('should serialize as parameters', async () => {
-        const server = createServer({}, (req, res) => {
+        const server = createServer({ saveUninitialized: true }, (req, res) => {
           req.secure = true;
           req.session.cookie.httpOnly = false;
           req.session.cookie.secure = true;
@@ -348,12 +348,15 @@ describe('req.session', () => {
       });
 
       it('should default to a browser-session length cookie', async () => {
-        const res = await fetch(createServer({ cookie: { path: '/admin' } }), '/admin').expectStatus(200);
+        const res = await fetch(
+          createServer({ cookie: { path: '/admin' }, saveUninitialized: true }),
+          '/admin'
+        ).expectStatus(200);
         shouldSetCookieWithoutAttribute('connect.sid', 'Expires')(res);
       });
 
       it('should Set-Cookie only once for browser-session cookies', async () => {
-        const server = createServer({ cookie: { path: '/admin' } });
+        const server = createServer({ cookie: { path: '/admin' }, saveUninitialized: true });
 
         const res = await fetch(server, '/admin/foo')
           .expect('Set-Cookie', /connect\.sid/)
@@ -372,7 +375,7 @@ describe('req.session', () => {
           priority: 'high',
           secure: true
         };
-        const server = createServer({ cookie: opts }, (req, res) => {
+        const server = createServer({ cookie: opts, saveUninitialized: true }, (req, res) => {
           req.session.cookie.secure = false;
           res.end();
         });
@@ -386,15 +389,21 @@ describe('req.session', () => {
       });
 
       it('should forward errors setting cookie', async () => {
-        const server = createServer({ cookie: { expires: new Date(Number.NaN) } }, (_req, res) => {
-          res.end();
-        });
+        const server = createServer(
+          { cookie: { expires: new Date(Number.NaN) }, saveUninitialized: true },
+          (_req, res) => {
+            res.end();
+          }
+        );
 
-        const { promise, resolve } = Promise.withResolvers();
+        const { promise, resolve, reject } = Promise.withResolvers();
         server.on('error', function onerror(err) {
-          assert.ok(err);
-          assert.match(err.message, /option expires is invalid/i);
-          resolve();
+          try {
+            assert.match(err.message, /option expires is invalid/i);
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
         });
 
         await Promise.all([promise, fetch(server, '/admin').expect(200)]);
@@ -552,7 +561,7 @@ describe('.maxAge', () => {
 describe('.expires', () => {
   describe('when given a Date', () => {
     it('should set absolute', async () => {
-      const server = createServer(null, (req, res) => {
+      const server = createServer({ saveUninitialized: true }, (req, res) => {
         req.session.cookie.expires = new Date(0);
         res.end();
       });
@@ -564,7 +573,7 @@ describe('.expires', () => {
 
   describe('when null', () => {
     it('should be a browser-session cookie', async () => {
-      const server = createServer(null, (req, res) => {
+      const server = createServer({ saveUninitialized: true }, (req, res) => {
         req.session.cookie.expires = null;
         res.end();
       });
@@ -574,7 +583,7 @@ describe('.expires', () => {
     });
 
     it('should not reset cookie', async () => {
-      const server = createServer(null, (req, res) => {
+      const server = createServer({ saveUninitialized: true }, (req, res) => {
         req.session.cookie.expires = null;
         res.end();
       });
@@ -606,7 +615,7 @@ describe('.expires', () => {
 describe('.partitioned', () => {
   describe('by default', () => {
     it('should not set partitioned attribute', async () => {
-      const server = createServer();
+      const server = createServer({ saveUninitialized: true });
 
       const res = await fetch(server, '/').expectStatus(200);
       shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')(res);
@@ -615,7 +624,7 @@ describe('.partitioned', () => {
 
   describe('when "false"', () => {
     it('should not set partitioned attribute', async () => {
-      const server = createServer({ cookie: { partitioned: false } });
+      const server = createServer({ cookie: { partitioned: false }, saveUninitialized: true });
 
       const res = await fetch(server, '/').expectStatus(200);
       shouldSetCookieWithoutAttribute('connect.sid', 'Partitioned')(res);
@@ -624,7 +633,7 @@ describe('.partitioned', () => {
 
   describe('when "true"', () => {
     it('should set partitioned attribute', async () => {
-      const server = createServer({ cookie: { partitioned: true } });
+      const server = createServer({ cookie: { partitioned: true }, saveUninitialized: true });
 
       const res = await fetch(server, '/').expectStatus(200);
       shouldSetCookieWithAttribute('connect.sid', 'Partitioned')(res);
