@@ -11,13 +11,13 @@ import crypto from 'node:crypto';
 import Debug from 'debug';
 import onHeaders from 'on-headers';
 import parseUrl from 'parseurl';
-import ufid from 'ufid';
+import { generator } from 'ufid';
 import Cookie from './session/cookie.js';
 import MemoryStore from './session/memory.js';
 import Session from './session/session.js';
 import Store from './session/store.js';
 
-const uid = ufid.generator({ size: 24 });
+const uid = generator({ size: 24 });
 const debug = Debug('connect-session');
 
 // environment
