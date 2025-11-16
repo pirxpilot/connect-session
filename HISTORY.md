@@ -1,4 +1,12 @@
 
+4.0.0 / 2025-11-16
+==================
+
+ * upgrade `ufid` to 2.0.0
+ * transition to ESM format
+ * `resave` now defaults to false
+ * `saveUnitialized` now defaults to false
+
 3.0.1 / 2025-11-14
 ==================
 
