@@ -5,16 +5,16 @@
  * MIT Licensed
  */
 
-const { EventEmitter } = require('node:events');
-const Cookie = require('./cookie');
-const Session = require('./session');
+import { EventEmitter } from 'node:events';
+import Cookie from './cookie.js';
+import Session from './session.js';
 
 /**
  * Abstract base class for session stores.
  * @public
  */
 
-class Store extends EventEmitter {
+export default class Store extends EventEmitter {
   /**
    * Re-generate the given requests's session.
    *
@@ -72,5 +72,3 @@ class Store extends EventEmitter {
     return req.session;
   }
 }
-
-module.exports = Store;

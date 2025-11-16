@@ -1,20 +1,7 @@
-const assert = require('node:assert');
-const utils = require('./utils');
+import assert from 'node:assert';
+import * as utils from './utils.js';
 
-module.exports = {
-  shouldSetSessionInStore,
-  shouldNotHaveHeader,
-  shouldNotSetSessionInStore,
-  shouldSetCookie,
-  shouldSetCookieToDifferentSessionId,
-  shouldSetCookieToExpireIn,
-  shouldSetCookieToValue,
-  shouldSetCookieWithAttribute,
-  shouldSetCookieWithAttributeAndValue,
-  shouldSetCookieWithoutAttribute
-};
-
-function shouldSetSessionInStore(store, delay) {
+export function shouldSetSessionInStore(store, delay) {
   const _set = store.set;
   let count = 0;
 
@@ -33,13 +20,13 @@ function shouldSetSessionInStore(store, delay) {
   };
 }
 
-function shouldNotHaveHeader(header) {
+export function shouldNotHaveHeader(header) {
   return res => {
     assert.ok(!res.headers.has(header), `should not have ${header} header`);
   };
 }
 
-function shouldNotSetSessionInStore(store) {
+export function shouldNotSetSessionInStore(store) {
   const _set = store.set;
   let count = 0;
 
@@ -53,7 +40,7 @@ function shouldNotSetSessionInStore(store) {
   };
 }
 
-function shouldSetCookie(name) {
+export function shouldSetCookie(name) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);
@@ -62,13 +49,13 @@ function shouldSetCookie(name) {
   };
 }
 
-function shouldSetCookieToDifferentSessionId(id) {
+export function shouldSetCookieToDifferentSessionId(id) {
   return res => {
     assert.notStrictEqual(utils.sid(res), id);
   };
 }
 
-function shouldSetCookieToExpireIn(name, delta) {
+export function shouldSetCookieToExpireIn(name, delta) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);
@@ -84,7 +71,7 @@ function shouldSetCookieToExpireIn(name, delta) {
   };
 }
 
-function shouldSetCookieToValue(name, val) {
+export function shouldSetCookieToValue(name, val) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);
@@ -94,7 +81,7 @@ function shouldSetCookieToValue(name, val) {
   };
 }
 
-function shouldSetCookieWithAttribute(name, attrib) {
+export function shouldSetCookieWithAttribute(name, attrib) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);
@@ -104,7 +91,7 @@ function shouldSetCookieWithAttribute(name, attrib) {
   };
 }
 
-function shouldSetCookieWithAttributeAndValue(name, attrib, value) {
+export function shouldSetCookieWithAttributeAndValue(name, attrib, value) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);
@@ -115,7 +102,7 @@ function shouldSetCookieWithAttributeAndValue(name, attrib, value) {
   };
 }
 
-function shouldSetCookieWithoutAttribute(name, attrib) {
+export function shouldSetCookieWithoutAttribute(name, attrib) {
   return res => {
     const header = utils.cookie(res);
     const data = header && utils.parseSetCookie(header);

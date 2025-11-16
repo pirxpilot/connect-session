@@ -12,7 +12,7 @@
  * @param {Object} options
  */
 
-class Cookie {
+export default class Cookie {
   constructor(options) {
     this.path = '/';
     this.maxAge = null;
@@ -114,5 +114,3 @@ class Cookie {
     return this.data;
   }
 }
-
-module.exports = Cookie;

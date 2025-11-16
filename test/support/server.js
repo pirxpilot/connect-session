@@ -1,17 +1,9 @@
-const http = require('node:http');
-const session = require('../../');
-const response = require('./response');
+import http from 'node:http';
+import cookieParser from 'cookie-parser';
+import session from '../../index.js';
+import response from './response.js';
 
-const cookieParser = require('cookie-parser');
-
-module.exports = {
-  createServer,
-  createSession,
-  createRequestListener,
-  mountAt
-};
-
-function createServer(setup, options, respond) {
+export function createServer(setup, options, respond) {
   const server = http.createServer();
 
   if (typeof setup === 'function') {
@@ -26,7 +18,7 @@ function createServer(setup, options, respond) {
   return server.on('request', createRequestListener(options, respond));
 }
 
-function createRequestListener(options, respond = end) {
+export function createRequestListener(options, respond = end) {
   const { secret = 'keyboard cat', ...opts } = options ?? {};
   const _session = createSession(opts);
 
@@ -64,7 +56,7 @@ function createRequestListener(options, respond = end) {
   }
 }
 
-function createSession(opts) {
+export function createSession(opts) {
   const options = opts || {};
   options.cookie ??= { maxAge: 60 * 1000 };
   return session(options);
@@ -74,7 +66,7 @@ function end(_req, res) {
   res.end();
 }
 
-function mountAt(path) {
+export function mountAt(path) {
   return (req, _res) => {
     if (req.url.indexOf(path) === 0) {
       req.originalUrl = req.url;

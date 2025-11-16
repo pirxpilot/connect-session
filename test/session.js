@@ -1,17 +1,13 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-
-const http = require('node:http');
-const { fetch } = require('supertest-fetch');
-const session = require('../');
-const SyncStore = require('./support/sync-store');
-const utils = require('./support/utils');
-const { cookie, storeGet, storeLen, storeSet } = utils;
-
-const { shouldSetSessionInStore, shouldSetCookieToDifferentSessionId } = require('./support/should');
-
-const { createServer } = require('./support/server');
-const timers = require('node:timers/promises');
+import assert from 'node:assert';
+import http from 'node:http';
+import { describe, it } from 'node:test';
+import timers from 'node:timers/promises';
+import { fetch } from 'supertest-fetch';
+import session from '../index.js';
+import { createServer } from './support/server.js';
+import { shouldSetCookieToDifferentSessionId, shouldSetSessionInStore } from './support/should.js';
+import SyncStore from './support/sync-store.js';
+import { cookie, expires, sid, storeGet, storeLen, storeSet, writePatch } from './support/utils.js';
 
 const min = 60 * 1000;
 
@@ -227,14 +223,14 @@ describe('session()', () => {
       .expectHeader('Set-Cookie', /connect\.sid/)
       .expect(200);
 
-    const originalExpires = utils.expires(res);
+    const originalExpires = expires(res);
     await timers.setTimeout(1000 - (Date.now() % 1000) + 200);
 
     const res2 = await fetch(server, '/', { headers: { Cookie: cookie(res) } })
       .expectHeader('Set-Cookie', /connect\.sid/)
       .expect(200);
 
-    assert.notEqual(originalExpires, utils.expires(res2));
+    assert.notEqual(originalExpires, expires(res2));
   });
 
   describe('when response ended', () => {
@@ -308,7 +304,7 @@ describe('session()', () => {
       const sess = await storeGet(store, id);
       assert.ok(sess, 'session saved to store');
       const exp = new Date(sess.cookie.expires);
-      assert.strictEqual(exp.toUTCString(), utils.expires(res));
+      assert.strictEqual(exp.toUTCString(), expires(res));
 
       await timers.setTimeout(1000 - (Date.now() % 1000) + 200);
 
@@ -370,7 +366,7 @@ describe('session()', () => {
         .expectStatus(200)
         .expectBody('session 2');
 
-      shouldSetCookieToDifferentSessionId(utils.sid(res))(res2);
+      shouldSetCookieToDifferentSessionId(sid(res))(res2);
     });
 
     it('should not exist in store', async () => {
@@ -406,7 +402,7 @@ describe('session()', () => {
         .expectStatus(200)
         .expectBody('session 1');
 
-      await storeSet(store, utils.sid(res), { foo: 'bar' });
+      await storeSet(store, sid(res), { foo: 'bar' });
 
       await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(500, /Cannot read prop/);
     });
@@ -414,7 +410,7 @@ describe('session()', () => {
     describe('res.end patch', () => {
       it('should correctly handle res.end/res.write patched prior', async () => {
         function setup(_req, res) {
-          utils.writePatch(res);
+          writePatch(res);
         }
 
         function respond(req, res) {
@@ -429,7 +425,7 @@ describe('session()', () => {
 
       it('should correctly handle res.end/res.write patched after', async () => {
         function respond(req, res) {
-          utils.writePatch(res);
+          writePatch(res);
           req.session.hit = true;
           res.write('hello, ');
           res.end('world');

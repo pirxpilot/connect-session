@@ -1,6 +1,6 @@
-const session = require('../../');
+import session from '../../index.js';
 
-class SyncStore extends session.Store {
+export default class SyncStore extends session.Store {
   sessions = Object.create(null);
 
   destroy(sid, callback) {
@@ -17,5 +17,3 @@ class SyncStore extends session.Store {
     callback();
   }
 }
-
-module.exports = SyncStore;

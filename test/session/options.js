@@ -1,20 +1,16 @@
-const { before, describe, it, after } = require('node:test');
-const assert = require('node:assert');
-const { fetch } = require('supertest-fetch');
-const utils = require('../support/utils');
-const { cookie, storeLen } = utils;
-
-const session = require('../../');
-
-const {
-  shouldSetSessionInStore,
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
+import { fetch } from 'supertest-fetch';
+import session from '../../index.js';
+import { createServer, mountAt } from '../support/server.js';
+import {
   shouldNotSetSessionInStore,
   shouldSetCookieToValue,
   shouldSetCookieWithAttribute,
-  shouldSetCookieWithoutAttribute
-} = require('../support/should');
-
-const { createServer, mountAt } = require('../support/server');
+  shouldSetCookieWithoutAttribute,
+  shouldSetSessionInStore
+} from '../support/should.js';
+import { cookie, storeLen } from '../support/utils.js';
 
 const min = 60 * 1000;
 

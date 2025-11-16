@@ -6,31 +6,29 @@
  * MIT Licensed
  */
 
-const Buffer = require('node:buffer').Buffer;
-const crypto = require('node:crypto');
-const debug = require('debug')('connect-session');
-const onHeaders = require('on-headers');
-const parseUrl = require('parseurl');
-const uid = require('ufid').generator({ size: 24 });
+import { Buffer } from 'node:buffer';
+import crypto from 'node:crypto';
+import Debug from 'debug';
+import onHeaders from 'on-headers';
+import parseUrl from 'parseurl';
+import ufid from 'ufid';
+import Cookie from './session/cookie.js';
+import MemoryStore from './session/memory.js';
+import Session from './session/session.js';
+import Store from './session/store.js';
 
-const Cookie = require('./session/cookie');
-const MemoryStore = require('./session/memory');
-const Session = require('./session/session');
-const Store = require('./session/store');
+const uid = ufid.generator({ size: 24 });
+const debug = Debug('connect-session');
 
 // environment
 
 const env = process.env.NODE_ENV;
 
 /**
- * Expose the middleware.
- */
-
-module.exports = session;
-
-/**
  * Expose constructors.
  */
+
+export { Store, Cookie, Session, MemoryStore };
 
 session.Store = Store;
 session.Cookie = Cookie;
@@ -63,7 +61,7 @@ const warning =
  * @public
  */
 
-function session(options = {}) {
+export default function session(options = {}) {
   const opts = options;
 
   // get the cookie options

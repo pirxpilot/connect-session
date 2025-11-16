@@ -1,17 +1,12 @@
-const { describe, it } = require('node:test');
-const { fetch } = require('supertest-fetch');
-const utils = require('../support/utils');
-const { cookie } = utils;
-const { createServer } = require('node:http');
-
-const cookieParser = require('cookie-parser');
-const connect = require('@pirxpilot/connect');
-
-const response = require('../support/response');
-
-const { createSession } = require('../support/server');
-
-const { shouldSetCookie } = require('../support/should');
+import { createServer } from 'node:http';
+import { describe, it } from 'node:test';
+import connect from '@pirxpilot/connect';
+import cookieParser from 'cookie-parser';
+import { fetch } from 'supertest-fetch';
+import response from '../support/response.js';
+import { createSession } from '../support/server.js';
+import { shouldSetCookie } from '../support/should.js';
+import { cookie, sid } from '../support/utils.js';
 
 describe('cookieParser()', () => {
   it('should reject unsigned from req.cookies', async () => {
@@ -34,7 +29,7 @@ describe('cookieParser()', () => {
 
     shouldSetCookie('sessid')(res);
 
-    const val = `sessid=${utils.sid(res)}`;
+    const val = `sessid=${sid(res)}`;
 
     await fetch(server, '/', { headers: { Cookie: val } }).expect(200, '1');
   });

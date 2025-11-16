@@ -6,14 +6,14 @@
  * MIT Licensed
  */
 
-const Store = require('./store');
+import Store from './store.js';
 
 /**
  * A session store in memory.
  * @public
  */
 
-class MemoryStore extends Store {
+export default class MemoryStore extends Store {
   sessions = Object.create(null);
 
   /**
@@ -152,5 +152,3 @@ function getSession(sessionId) {
 
   return sess;
 }
-
-module.exports = MemoryStore;

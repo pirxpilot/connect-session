@@ -1,44 +1,31 @@
-const { promisify } = require('node:util');
+import { promisify } from 'node:util';
 
-module.exports = {
-  cookie,
-  sid,
-  expires,
-  parseSetCookie,
-  writePatch,
-  storeGet,
-  storeLen,
-  storeSet,
-  storeLoad,
-  storeClear
-};
-
-function storeLen(store) {
+export function storeLen(store) {
   const fn = promisify(store.length).bind(store);
   return fn();
 }
 
-function storeGet(store, ...args) {
+export function storeGet(store, ...args) {
   const fn = promisify(store.get).bind(store);
   return fn(...args);
 }
 
-function storeSet(store, ...args) {
+export function storeSet(store, ...args) {
   const fn = promisify(store.set).bind(store);
   return fn(...args);
 }
 
-function storeLoad(store, ...args) {
+export function storeLoad(store, ...args) {
   const fn = promisify(store.load).bind(store);
   return fn(...args);
 }
 
-function storeClear(store) {
+export function storeClear(store) {
   const fn = promisify(store.clear).bind(store);
   return fn();
 }
 
-function parseSetCookie(header = '') {
+export function parseSetCookie(header = '') {
   let match;
   const pairs = [];
   const pattern = /\s*([^=;]+)(?:=([^;]*);?|;|$)/g;
@@ -57,7 +44,7 @@ function parseSetCookie(header = '') {
   return cookie;
 }
 
-function writePatch(res) {
+export function writePatch(res) {
   const _end = res.end;
   const _write = res.write;
   let ended = false;
@@ -76,7 +63,7 @@ function writePatch(res) {
   };
 }
 
-function sid(res) {
+export function sid(res) {
   const header = cookie(res);
   const data = parseSetCookie(header);
   if (!data) {
@@ -86,11 +73,11 @@ function sid(res) {
   return value?.slice(2, value.indexOf('.'));
 }
 
-function cookie(res) {
+export function cookie(res) {
   return res.headers.getSetCookie()[0];
 }
 
-function expires(res) {
+export function expires(res) {
   const header = cookie(res);
   return parseSetCookie(header).expires;
 }

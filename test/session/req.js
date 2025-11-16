@@ -1,26 +1,21 @@
-const { before, describe, it, after } = require('node:test');
-const assert = require('node:assert');
-const { fetch } = require('supertest-fetch');
-const timers = require('node:timers/promises');
-const http = require('node:http');
-
-const utils = require('../support/utils');
-const { cookie, storeGet, storeLoad } = utils;
-const SmartStore = require('../support/smart-store');
-
-const session = require('../../');
-
-const {
-  shouldSetSessionInStore,
-  shouldSetCookieToExpireIn,
+import assert from 'node:assert';
+import http from 'node:http';
+import { after, before, describe, it } from 'node:test';
+import timers from 'node:timers/promises';
+import { fetch } from 'supertest-fetch';
+import session from '../../index.js';
+import { createRequestListener, createServer } from '../support/server.js';
+import {
   shouldSetCookieToDifferentSessionId,
-  shouldSetCookieWithAttributeAndValue,
+  shouldSetCookieToExpireIn,
   shouldSetCookieToValue,
   shouldSetCookieWithAttribute,
-  shouldSetCookieWithoutAttribute
-} = require('../support/should');
-
-const { createServer, createRequestListener } = require('../support/server');
+  shouldSetCookieWithAttributeAndValue,
+  shouldSetCookieWithoutAttribute,
+  shouldSetSessionInStore
+} from '../support/should.js';
+import SmartStore from '../support/smart-store.js';
+import { cookie, sid, storeGet, storeLoad } from '../support/utils.js';
 
 const min = 60 * 1000;
 
@@ -34,7 +29,7 @@ describe('req.session', () => {
     });
 
     const res = await fetch(server, '/').expect(200, 'hits: 1');
-    const sess = await storeLoad(store, utils.sid(res));
+    const sess = await storeLoad(store, sid(res));
     assert.ok(sess);
     await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200, 'hits: 2');
   });
@@ -136,7 +131,7 @@ describe('req.session', () => {
       })
         .expect('Set-Cookie', /connect\.sid/)
         .expect(200, 'false');
-      shouldSetCookieToDifferentSessionId(utils.sid(res))(res2);
+      shouldSetCookieToDifferentSessionId(sid(res))(res2);
     });
   });
 
@@ -321,7 +316,7 @@ describe('req.session', () => {
       });
 
       const res = await fetch(server, '/').expect(200);
-      const id = utils.sid(res);
+      const id = sid(res);
       let sess = await storeGet(store, id);
       const exp = new Date(sess.cookie.expires);
 

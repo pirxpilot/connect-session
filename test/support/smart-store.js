@@ -1,6 +1,6 @@
-const session = require('../../');
+import session from '../../index.js';
 
-class SmartStore extends session.Store {
+export default class SmartStore extends session.Store {
   sessions = Object.create(null);
 
   destroy(sid, callback) {
@@ -38,5 +38,3 @@ class SmartStore extends session.Store {
     setImmediate(callback, null);
   }
 }
-
-module.exports = SmartStore;
