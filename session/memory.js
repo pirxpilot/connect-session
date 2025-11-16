@@ -10,69 +10,54 @@ import Store from './store.js';
 
 /**
  * A session store in memory.
- * @public
  */
-
 export default class MemoryStore extends Store {
-  sessions = Object.create(null);
+  #sessions = Object.create(null);
 
   /**
-   * Get all active sessions.
+   * Get all active #sessions.
    *
-   * @param {function} callback
-   * @public
    */
-
-  all(callback) {
-    const sessionIds = Object.keys(this.sessions);
+  async all() {
+    const sessionIds = Object.keys(this.#sessions);
     const sessions = Object.create(null);
 
     for (let i = 0; i < sessionIds.length; i++) {
       const sessionId = sessionIds[i];
-      const session = getSession.call(this, sessionId);
+      const session = this.#getSession(sessionId);
 
       if (session) {
         sessions[sessionId] = session;
       }
     }
 
-    return callback && setImmediate(callback, null, sessions);
+    return sessions;
   }
 
   /**
-   * Clear all sessions.
-   *
-   * @param {function} callback
-   * @public
+   * Clear all #sessions.
    */
-
-  clear(callback) {
-    this.sessions = Object.create(null);
-    return callback && setImmediate(callback);
+  async clear() {
+    this.#sessions = Object.create(null);
   }
 
   /**
    * Destroy the session associated with the given session ID.
    *
    * @param {string} sessionId
-   * @public
    */
 
-  destroy(sessionId, callback) {
-    delete this.sessions[sessionId];
-    return callback && setImmediate(callback);
+  async destroy(sessionId) {
+    delete this.#sessions[sessionId];
   }
 
   /**
    * Fetch session by the given session ID.
    *
    * @param {string} sessionId
-   * @param {function} callback
-   * @public
    */
-
-  get(sessionId, callback) {
-    setImmediate(callback, null, getSession.call(this, sessionId));
+  async get(sessionId) {
+    return this.#getSession(sessionId);
   }
 
   /**
@@ -80,27 +65,17 @@ export default class MemoryStore extends Store {
    *
    * @param {string} sessionId
    * @param {object} session
-   * @param {function} callback
-   * @public
    */
-
-  set(sessionId, session, callback) {
-    this.sessions[sessionId] = JSON.stringify(session);
-    return callback && setImmediate(callback);
+  async set(sessionId, session) {
+    this.#sessions[sessionId] = JSON.stringify(session);
   }
 
   /**
-   * Get number of active sessions.
-   *
-   * @param {function} callback
-   * @public
+   * Get number of active #sessions.
    */
-
-  length(callback) {
-    this.all((err, sessions) => {
-      if (err) return callback(err);
-      callback(null, Object.keys(sessions).length);
-    });
+  async length() {
+    const sessions = await this.all();
+    return Object.keys(sessions).length;
   }
 
   /**
@@ -108,47 +83,40 @@ export default class MemoryStore extends Store {
    *
    * @param {string} sessionId
    * @param {object} session
-   * @param {function} callback
-   * @public
    */
-
-  touch(sessionId, session, callback) {
-    const currentSession = getSession.call(this, sessionId);
+  async touch(sessionId, session) {
+    const currentSession = this.#getSession(sessionId);
 
     if (currentSession) {
       // update expiration
       currentSession.cookie = session.cookie;
-      this.sessions[sessionId] = JSON.stringify(currentSession);
+      this.#sessions[sessionId] = JSON.stringify(currentSession);
     }
-
-    return callback && setImmediate(callback);
-  }
-}
-
-/**
- * Get session from the store.
- * @private
- */
-
-function getSession(sessionId) {
-  let sess = this.sessions[sessionId];
-
-  if (!sess) {
-    return;
   }
 
-  // parse
-  sess = JSON.parse(sess);
+  /**
+   * Get session from the store.
+   */
+  #getSession(sessionId) {
+    const json = this.#sessions[sessionId];
 
-  if (sess.cookie) {
-    const expires = typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
-
-    // destroy expired session
-    if (expires && expires <= Date.now()) {
-      delete this.sessions[sessionId];
+    if (!json) {
       return;
     }
-  }
 
-  return sess;
+    // parse
+    const sess = JSON.parse(json);
+
+    if (sess.cookie) {
+      const expires = typeof sess.cookie.expires === 'string' ? new Date(sess.cookie.expires) : sess.cookie.expires;
+
+      // destroy expired session
+      if (expires && expires <= Date.now()) {
+        delete this.#sessions[sessionId];
+        return;
+      }
+    }
+
+    return sess;
+  }
 }

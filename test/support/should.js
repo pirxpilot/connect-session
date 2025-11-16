@@ -1,18 +1,16 @@
 import assert from 'node:assert';
+import { setTimeout } from 'node:timers/promises';
 import * as utils from './utils.js';
 
-export function shouldSetSessionInStore(store, delay) {
+export function shouldSetSessionInStore(store, delay = 0) {
   const _set = store.set;
   let count = 0;
 
-  store.set = function set(...args) {
+  store.set = async function set(...args) {
     count++;
 
-    if (!delay) {
-      return _set.apply(this, args);
-    }
-
-    setTimeout(() => _set.apply(this, args), delay);
+    await setTimeout(delay);
+    return _set.apply(this, args);
   };
 
   return () => {

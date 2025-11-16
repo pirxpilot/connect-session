@@ -15,7 +15,7 @@ import {
   shouldSetSessionInStore
 } from '../support/should.js';
 import SmartStore from '../support/smart-store.js';
-import { cookie, sid, storeGet, storeLoad } from '../support/utils.js';
+import { cookie, sid } from '../support/utils.js';
 
 const min = 60 * 1000;
 
@@ -29,7 +29,7 @@ describe('req.session', () => {
     });
 
     const res = await fetch(server, '/').expect(200, 'hits: 1');
-    const sess = await storeLoad(store, sid(res));
+    const sess = await store.load(sid(res));
     assert.ok(sess);
     await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200, 'hits: 2');
   });
@@ -103,10 +103,10 @@ describe('req.session', () => {
   describe('.destroy()', () => {
     it('should destroy the previous session', async () => {
       const server = createServer(null, (req, res) => {
-        req.session.destroy(err => {
-          if (err) res.statusCode = 500;
-          res.end(String(req.session));
-        });
+        req.session
+          .destroy()
+          .catch(() => (res.statusCode = 500))
+          .then(() => res.end(String(req.session)));
       });
 
       await fetch(server, '/').expect('Set-Cookie', null).expect(200, 'undefined');
@@ -117,10 +117,10 @@ describe('req.session', () => {
     it('should destroy/replace the previous session', async () => {
       const server = createServer(null, (req, res) => {
         const id = req.session.id;
-        req.session.regenerate(err => {
-          if (err) res.statusCode = 500;
-          res.end(String(req.session.id === id));
-        });
+        req.session
+          .regenerate()
+          .catch(() => (res.statusCode = 500))
+          .then(() => res.end(String(req.session.id === id)));
       });
 
       const res = await fetch(server, '/')
@@ -159,11 +159,8 @@ describe('req.session', () => {
 
         fetch(server, '/bar', { headers: { Cookie: val } })
           .expect(200, 'saw /bar')
-          .then(() => {
-            req.session.reload(() => {
-              res.end(`saw ${req.session.url}`);
-            });
-          });
+          .then(() => req.session.reload())
+          .then(() => res.end(`saw ${req.session.url}`));
       }
     });
 
@@ -176,13 +173,16 @@ describe('req.session', () => {
           return;
         }
 
-        store.clear(err => {
-          if (err) return res.end(err.message);
-          req.session.reload(err => {
-            res.statusCode = err ? 500 : 200;
-            res.end(err ? err.message : '');
-          });
-        });
+        store
+          .clear()
+          .then(() => req.session.reload())
+          .then(
+            () => res.end(''),
+            err => {
+              res.statusCode = 500;
+              res.end(err.message);
+            }
+          );
       });
 
       const res = await fetch(server, '/').expect(200, 'session created');
@@ -198,28 +198,23 @@ describe('req.session', () => {
           return;
         }
 
-        store.clear(err => {
-          if (err) return res.end(err.message);
-
-          // reload way too many times on top of each other,
-          // attempting to overflow the call stack
-          let iters = 20;
-          reload();
-
-          function reload() {
-            if (!--iters) {
-              res.end('ok');
-              return;
+        store
+          .clear()
+          .then(async () => {
+            // reload way too many times on top of each other,
+            // attempting to overflow the call stack
+            const tasks = [];
+            let iters = 20;
+            while (iters--) {
+              tasks.push(req.session.reload());
             }
-
-            try {
-              req.session.reload(reload);
-            } catch (e) {
-              res.statusCode = 500;
-              res.end(e.message);
-            }
-          }
-        });
+            await Promise.allSettled(tasks);
+            res.end('ok');
+          })
+          .catch(err => {
+            res.statusCode = 500;
+            res.end(err.message);
+          });
       });
 
       const res = await fetch(server, '/').expect(200, 'session created');
@@ -232,13 +227,11 @@ describe('req.session', () => {
       const store = new session.MemoryStore();
       const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
-        req.session.save(err => {
-          if (err) return res.end(err.message);
-          store.get(req.session.id, (err, sess) => {
-            if (err) return res.end(err.message);
-            res.end(sess ? 'stored' : 'empty');
-          });
-        });
+        req.session
+          .save()
+          .then(() => store.get(req.session.id))
+          .then(sess => res.end(sess ? 'stored' : 'empty'))
+          .catch(err => res.end(err.message));
       });
 
       await fetch(server, '/').expect(200, 'stored');
@@ -248,10 +241,10 @@ describe('req.session', () => {
       const store = new session.MemoryStore();
       const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
-        req.session.save(err => {
-          if (err) return res.end(err.message);
-          res.end('saved');
-        });
+        req.session
+          .save()
+          .then(() => res.end('saved'))
+          .catch(err => res.end(err.message));
       });
 
       let check = shouldSetSessionInStore(store);
@@ -267,12 +260,12 @@ describe('req.session', () => {
       const store = new session.MemoryStore();
       const server = createServer({ store }, (req, res) => {
         req.session.hit = true;
-        req.session.reload(() => {
-          req.session.save(err => {
-            if (err) return res.end(err.message);
-            res.end('saved');
-          });
-        });
+        req.session
+          .reload()
+          .catch(() => {})
+          .then(() => req.session.save())
+          .then(() => res.end('saved'))
+          .catch(err => res.end(err.message));
       });
 
       let check = shouldSetSessionInStore(store);
@@ -289,10 +282,10 @@ describe('req.session', () => {
         const store = new session.MemoryStore();
         const server = createServer({ saveUninitialized: false, store }, (req, res) => {
           req.session.hit = true;
-          req.session.save(err => {
-            if (err) return res.end(err.message);
-            res.end('saved');
-          });
+          req.session
+            .save()
+            .then(() => res.end('saved'))
+            .catch(err => res.end(err.message));
         });
 
         let check = shouldSetSessionInStore(store);
@@ -309,20 +302,20 @@ describe('req.session', () => {
   describe('.touch()', () => {
     it('should reset session expiration', async () => {
       const store = new session.MemoryStore();
-      const server = createServer({ resave: false, store, cookie: { maxAge: min } }, (req, res) => {
+      const server = createServer({ resave: false, store, cookie: { maxAge: min } }, async (req, res) => {
         req.session.hit = true;
-        req.session.touch();
+        await req.session.touch();
         res.end();
       });
 
       const res = await fetch(server, '/').expect(200);
       const id = sid(res);
-      let sess = await storeGet(store, id);
+      let sess = await store.get(id);
       const exp = new Date(sess.cookie.expires);
 
       await timers.setTimeout(100);
       await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200);
-      sess = await storeGet(store, id);
+      sess = await store.get(id);
       assert.notStrictEqual(new Date(sess.cookie.expires).getTime(), exp.getTime());
     });
   });
@@ -383,7 +376,7 @@ describe('req.session', () => {
         shouldSetCookieWithAttributeAndValue('connect.sid', 'Priority', 'High')(res);
       });
 
-      it('should forward errors setting cookie', async () => {
+      it('should forward errors setting cookie', async t => {
         const server = createServer(
           { cookie: { expires: new Date(Number.NaN) }, saveUninitialized: true },
           (_req, res) => {
@@ -391,17 +384,12 @@ describe('req.session', () => {
           }
         );
 
-        const { promise, resolve, reject } = Promise.withResolvers();
+        t.plan(1);
         server.on('error', function onerror(err) {
-          try {
-            assert.match(err.message, /option expires is invalid/i);
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
+          t.assert.match(err.message, /option expires is invalid/i);
         });
 
-        await Promise.all([promise, fetch(server, '/admin').expect(200)]);
+        await fetch(server, '/admin').expect(200);
       });
 
       it('should preserve cookies set before writeHead is called', async () => {

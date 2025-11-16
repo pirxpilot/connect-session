@@ -30,9 +30,7 @@ export default class Cookie {
       }
     }
 
-    if (this.originalMaxAge === undefined || this.originalMaxAge === null) {
-      this.originalMaxAge = this.maxAge;
-    }
+    this.originalMaxAge ??= this.maxAge;
   }
 
   /*!

@@ -1,19 +1,17 @@
 import session from '../../index.js';
 
 export default class SyncStore extends session.Store {
-  sessions = Object.create(null);
+  #sessions = Object.create(null);
 
-  destroy(sid, callback) {
-    delete this.sessions[sid];
-    callback();
+  async destroy(sid) {
+    delete this.#sessions[sid];
   }
 
-  get(sid, callback) {
-    callback(null, JSON.parse(this.sessions[sid]));
+  async get(sid) {
+    return JSON.parse(this.#sessions[sid]);
   }
 
-  set(sid, sess, callback) {
-    this.sessions[sid] = JSON.stringify(sess);
-    callback();
+  async set(sid, sess) {
+    this.#sessions[sid] = JSON.stringify(sess);
   }
 }

@@ -261,14 +261,13 @@ export default function session(options = {}) {
       if (shouldDestroy(req)) {
         // destroy session
         debug('destroying');
-        store.destroy(req.sessionID, function ondestroy(err) {
-          if (err) {
-            setImmediate(next, err);
-          }
-
-          debug('destroyed');
-          writeend();
-        });
+        store
+          .destroy(req.sessionID)
+          .catch(next)
+          .then(() => {
+            debug('destroyed');
+            writeend();
+          });
 
         return writetop();
       }
@@ -286,27 +285,22 @@ export default function session(options = {}) {
       }
 
       if (shouldSave(req)) {
-        req.session.save(function onsave(err) {
-          if (err) {
-            setImmediate(next, err);
-          }
-
-          writeend();
-        });
-
+        req.session
+          .save()
+          .catch(next)
+          .then(() => writeend());
         return writetop();
       }
       if (storeImplementsTouch && shouldTouch(req)) {
         // store implements touch method
         debug('touching');
-        store.touch(req.sessionID, req.session, function ontouch(err) {
-          if (err) {
-            setImmediate(next, err);
-          }
-
-          debug('touched');
-          writeend();
-        });
+        store
+          .touch(req.sessionID, req.session)
+          .catch(next)
+          .then(() => {
+            debug('touched');
+            writeend();
+          });
 
         return writetop();
       }
@@ -335,30 +329,22 @@ export default function session(options = {}) {
       wrapmethods(req.session);
     }
 
-    function rewrapmethods(sess, callback) {
-      return function (...args) {
-        if (req.session !== sess) {
-          wrapmethods(req.session);
-        }
-
-        callback.apply(this, args);
-      };
-    }
-
     // wrap session methods
     function wrapmethods(sess) {
-      const _reload = sess.reload;
-      const _save = sess.save;
+      const { reload: _reload, save: _save } = sess;
 
-      function reload(callback) {
+      async function reload() {
         debug('reloading %s', this.id);
-        _reload.call(this, rewrapmethods(this, callback));
+        await _reload.call(this);
+        if (req.session !== this) {
+          wrapmethods(req.session);
+        }
       }
 
       function save(...args) {
         debug('saving %s', this.id);
         savedHash = hash(this);
-        _save.apply(this, args);
+        return _save.apply(this, args);
       }
 
       Object.defineProperty(sess, 'reload', {
@@ -437,29 +423,25 @@ export default function session(options = {}) {
 
     // generate the session object
     debug('fetching %s', req.sessionID);
-    store.get(req.sessionID, (err, sess) => {
-      // error handling
-      if (err && err.code !== 'ENOENT') {
-        debug('error %j', err);
-        next(err);
-        return;
-      }
-
-      try {
-        if (err || !sess) {
+    store
+      .get(req.sessionID)
+      .catch(err => {
+        if (err.code !== 'ENOENT') {
+          debug('error %j', err);
+          throw err;
+        }
+      })
+      .then(sess => {
+        if (!sess) {
           debug('no session found');
           generate();
         } else {
           debug('session found');
           inflate(req, sess);
         }
-      } catch (e) {
-        next(e);
-        return;
-      }
-
-      next();
-    });
+        next();
+      })
+      .catch(next);
   };
 }
 

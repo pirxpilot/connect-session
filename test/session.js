@@ -7,7 +7,7 @@ import session from '../index.js';
 import { createServer } from './support/server.js';
 import { shouldSetCookieToDifferentSessionId, shouldSetSessionInStore } from './support/should.js';
 import SyncStore from './support/sync-store.js';
-import { cookie, expires, sid, storeGet, storeLen, storeSet, writePatch } from './support/utils.js';
+import { cookie, expires, sid, writePatch } from './support/utils.js';
 
 const min = 60 * 1000;
 
@@ -52,7 +52,7 @@ describe('session()', () => {
       .expectStatus(200)
       .expectBody('session active');
 
-    const len = await storeLen(store);
+    const len = await store.length();
     assert.strictEqual(len, 1);
   });
 
@@ -79,8 +79,8 @@ describe('session()', () => {
       res.end('hello, world');
     });
 
-    store.get = function destroy(_sid, callback) {
-      callback(new Error('boom!'));
+    store.get = async function destroy(_sid) {
+      throw new Error('boom!');
     };
 
     const res = await fetch(server, '/')
@@ -101,10 +101,10 @@ describe('session()', () => {
       res.end(`session ${req.session.num}`);
     });
 
-    store.get = function destroy(_sid, callback) {
+    store.get = async function destroy(_sid) {
       const err = new Error('boom!');
       err.code = 'ENOENT';
-      callback(err);
+      throw err;
     };
 
     const res = await fetch(server, '/')
@@ -132,7 +132,7 @@ describe('session()', () => {
       fetch(server, '/').expectStatus(200).expectBody('session created')
     ]);
 
-    const len = await storeLen(store);
+    const len = await store.length();
     assert.strictEqual(len, 2);
   });
 
@@ -176,10 +176,10 @@ describe('session()', () => {
     });
 
     const res = await fetch(server, '/').expectStatus(200).expectBody('session saved');
-    const sess = await storeGet(store, sid);
+    const sess = await store.get(sid);
     // save is reserved
     sess.save = 'nope';
-    await storeSet(store, sid, sess);
+    await store.set(sid, sess);
     await fetch(server, '/', { headers: { Cookie: cookie(res) } })
       .expectStatus(200)
       .expectBody('session saved');
@@ -206,7 +206,7 @@ describe('session()', () => {
 
     await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
 
-    const len = await storeLen(store);
+    const len = await store.length();
     assert.strictEqual(len, 0);
   });
 
@@ -301,7 +301,7 @@ describe('session()', () => {
         .expect(200);
 
       const id = await res.text();
-      const sess = await storeGet(store, id);
+      const sess = await store.get(id);
       assert.ok(sess, 'session saved to store');
       const exp = new Date(sess.cookie.expires);
       assert.strictEqual(exp.toUTCString(), expires(res));
@@ -313,7 +313,7 @@ describe('session()', () => {
       }).expect(200);
 
       assert.strictEqual(await res2.text(), id);
-      const sess2 = await storeGet(store, id);
+      const sess2 = await store.get(id);
 
       assert.ok(sess2, 'session still in store');
       assert.notEqual(
@@ -383,7 +383,7 @@ describe('session()', () => {
         .expectBody('session 1');
       await timers.setTimeout(10);
 
-      const len = await storeLen(store);
+      const len = await store.length();
       assert.strictEqual(len, 0);
     });
   });
@@ -402,9 +402,9 @@ describe('session()', () => {
         .expectStatus(200)
         .expectBody('session 1');
 
-      await storeSet(store, sid(res), { foo: 'bar' });
+      await store.set(sid(res), { foo: 'bar' });
 
-      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(500, /Cannot read prop/);
+      await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(500, /Cannot destructure property/);
     });
 
     describe('res.end patch', () => {

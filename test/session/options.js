@@ -10,7 +10,7 @@ import {
   shouldSetCookieWithoutAttribute,
   shouldSetSessionInStore
 } from '../support/should.js';
-import { cookie, storeLen } from '../support/utils.js';
+import { cookie } from '../support/utils.js';
 
 const min = 60 * 1000;
 
@@ -363,27 +363,24 @@ describe('session options', () => {
         check();
       });
 
-      it('should pass session touch error', async () => {
+      it('should pass session touch error', async t => {
         const store = new session.MemoryStore();
         const server = createServer({ store, resave: false }, (req, res) => {
           req.session.hit = true;
           res.end('session saved');
         });
 
-        store.touch = function touch(_sid, _sess, callback) {
-          callback(new Error('boom!'));
-        };
-
-        const { promise, resolve } = Promise.withResolvers();
+        t.plan(1);
+        t.mock.method(store, 'touch', async () => {
+          throw new Error('boom!');
+        });
 
         server.on('error', function onerror(err) {
-          assert.ok(err);
-          assert.strictEqual(err.message, 'boom!');
-          resolve();
+          t.assert.strictEqual(err.message, 'boom!');
         });
 
         const res = await fetch(server, '/').expect(200, 'session saved');
-        await Promise.all([promise, await fetch(server, '/', { headers: { Cookie: cookie(res) } })]);
+        await fetch(server, '/', { headers: { Cookie: cookie(res) } });
       });
     });
   });
@@ -433,24 +430,22 @@ describe('session options', () => {
       check(res);
     });
 
-    it('should pass session save error', async () => {
+    it('should pass session save error', async t => {
       const store = new session.MemoryStore();
       const server = createServer({ store, saveUninitialized: true }, (_req, res) => {
         res.end('session saved');
       });
 
-      store.set = function destroy(_sid, _sess, callback) {
-        callback(new Error('boom!'));
-      };
-
-      const { promise, resolve } = Promise.withResolvers();
-      server.on('error', function onerror(err) {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'boom!');
-        resolve();
+      t.plan(1);
+      t.mock.method(store, 'set', async () => {
+        throw new Error('boom!');
       });
 
-      await Promise.all([fetch(server, '/').expect(200, 'session saved'), promise]);
+      server.on('error', function onerror(err) {
+        t.assert.strictEqual(err?.message, 'boom!');
+      });
+
+      await fetch(server, '/').expect(200, 'session saved');
     });
 
     it('should prevent uninitialized session from being touched', async () => {
@@ -554,10 +549,10 @@ describe('session options', () => {
       });
 
       const res = await fetch(server, '/').expectStatus(200);
-      let len = await storeLen(store);
+      let len = await store.length();
       assert.strictEqual(len, 1);
       await fetch(server, '/', { headers: { Cookie: cookie(res) } }).expect(200);
-      len = await storeLen(store);
+      len = await store.length();
       assert.strictEqual(len, 1);
     });
 
@@ -571,13 +566,13 @@ describe('session options', () => {
       });
 
       const res = await fetch(server, '/').expectStatus(200);
-      let len = await storeLen(store);
+      let len = await store.length();
       assert.strictEqual(len, 1);
 
       await fetch(server, '/', {
         headers: { Cookie: cookie(res) }
       }).expectStatus(200);
-      len = await storeLen(store);
+      len = await store.length();
       assert.strictEqual(len, 0);
     });
 
@@ -590,29 +585,26 @@ describe('session options', () => {
 
       const _res = await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
 
-      const len = await storeLen(store);
+      const len = await store.length();
       assert.strictEqual(len, 0);
     });
 
-    it('should pass session destroy error', async () => {
+    it('should pass session destroy error', async t => {
       const store = new session.MemoryStore();
       const server = createServer({ store, unset: 'destroy' }, (req, res) => {
         req.session = null;
         res.end('session destroyed');
       });
 
-      store.destroy = function destroy(_sid, callback) {
-        callback(new Error('boom!'));
-      };
-
-      const { promise, resolve } = Promise.withResolvers();
+      t.plan(1);
+      t.mock.method(store, 'destroy', async () => {
+        throw new Error('boom!');
+      });
       server.on('error', function onerror(err) {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'boom!');
-        resolve();
+        t.assert.strictEqual(err?.message, 'boom!');
       });
 
-      await Promise.all([fetch(server, '/').expect(200, 'session destroyed'), promise]);
+      await fetch(server, '/').expect(200, 'session destroyed');
     });
   });
 });

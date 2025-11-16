@@ -19,31 +19,24 @@ export default class Store extends EventEmitter {
    * Re-generate the given requests's session.
    *
    * @param {IncomingRequest} req
-   * @return {Function} fn
    */
 
-  regenerate(req, fn) {
-    this.destroy(req.sessionID, err => {
-      this.generate(req);
-      fn(err);
-    });
+  async regenerate(req) {
+    await this.destroy(req.sessionID);
+    await this.generate(req);
   }
 
   /**
-   * Load a `Session` instance via the given `sid`
-   * and invoke the callback `fn(err, sess)`.
+   * Load a `Session` instance via the given `sid`.
    *
    * @param {String} sid
-   * @param {Function} fn
    */
 
-  load(sid, fn) {
-    this.get(sid, (err, sess) => {
-      if (err) return fn(err);
-      if (!sess) return fn();
-      const req = { sessionID: sid, sessionStore: this };
-      fn(null, this.createSession(req, sess));
-    });
+  async load(sid) {
+    const sess = await this.get(sid);
+    if (!sess) return;
+    const req = { sessionID: sid, sessionStore: this };
+    return this.createSession(req, sess);
   }
 
   /**
@@ -55,8 +48,7 @@ export default class Store extends EventEmitter {
    */
 
   createSession(req, sess) {
-    const expires = sess.cookie.expires;
-    const originalMaxAge = sess.cookie.originalMaxAge;
+    const { expires, originalMaxAge } = sess.cookie;
 
     sess.cookie = new Cookie(sess.cookie);
 

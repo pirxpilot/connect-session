@@ -1,30 +1,3 @@
-import { promisify } from 'node:util';
-
-export function storeLen(store) {
-  const fn = promisify(store.length).bind(store);
-  return fn();
-}
-
-export function storeGet(store, ...args) {
-  const fn = promisify(store.get).bind(store);
-  return fn(...args);
-}
-
-export function storeSet(store, ...args) {
-  const fn = promisify(store.set).bind(store);
-  return fn(...args);
-}
-
-export function storeLoad(store, ...args) {
-  const fn = promisify(store.load).bind(store);
-  return fn(...args);
-}
-
-export function storeClear(store) {
-  const fn = promisify(store.clear).bind(store);
-  return fn();
-}
-
 export function parseSetCookie(header = '') {
   let match;
   const pairs = [];

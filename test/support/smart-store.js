@@ -1,15 +1,14 @@
 import session from '../../index.js';
 
 export default class SmartStore extends session.Store {
-  sessions = Object.create(null);
+  #sessions = Object.create(null);
 
-  destroy(sid, callback) {
-    delete this.sessions[sid];
-    setImmediate(callback, null);
+  async destroy(sid) {
+    delete this.#sessions[sid];
   }
 
-  get(sid, callback) {
-    let sess = this.sessions[sid];
+  async get(sid) {
+    let sess = this.#sessions[sid];
 
     if (!sess) {
       return;
@@ -25,16 +24,15 @@ export default class SmartStore extends session.Store {
 
       // destroy expired session
       if (sess.cookie.expires && sess.cookie.expires <= Date.now()) {
-        delete this.sessions[sid];
+        delete this.#sessions[sid];
         sess = null;
       }
     }
 
-    setImmediate(callback, null, sess);
+    return sess;
   }
 
-  set(sid, sess, callback) {
-    this.sessions[sid] = JSON.stringify(sess);
-    setImmediate(callback, null);
+  async set(sid, sess) {
+    this.#sessions[sid] = JSON.stringify(sess);
   }
 }
