@@ -1,25 +1,19 @@
-const session = require('../../');
-const util = require('node:util');
+import session from '../../index.js';
 
-module.exports = SyncStore;
+export default class SyncStore extends session.Store {
+  sessions = Object.create(null);
 
-function SyncStore() {
-  session.Store.call(this);
-  this.sessions = Object.create(null);
+  destroy(sid, callback) {
+    delete this.sessions[sid];
+    callback();
+  }
+
+  get(sid, callback) {
+    callback(null, JSON.parse(this.sessions[sid]));
+  }
+
+  set(sid, sess, callback) {
+    this.sessions[sid] = JSON.stringify(sess);
+    callback();
+  }
 }
-
-util.inherits(SyncStore, session.Store);
-
-SyncStore.prototype.destroy = function destroy(sid, callback) {
-  delete this.sessions[sid];
-  callback();
-};
-
-SyncStore.prototype.get = function get(sid, callback) {
-  callback(null, JSON.parse(this.sessions[sid]));
-};
-
-SyncStore.prototype.set = function set(sid, sess, callback) {
-  this.sessions[sid] = JSON.stringify(sess);
-  callback();
-};

@@ -1,15 +1,10 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const { fetch } = require('supertest-fetch');
-
-const utils = require('../support/utils');
-const { cookie, storeClear } = utils;
-
-const session = require('../../');
-
-const { shouldSetCookieToDifferentSessionId } = require('../support/should');
-
-const { createServer } = require('../support/server');
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
+import { fetch } from 'supertest-fetch';
+import session from '../../index.js';
+import { createServer } from '../support/server.js';
+import { shouldSetCookieToDifferentSessionId } from '../support/should.js';
+import { cookie, sid, storeClear } from '../support/utils.js';
 
 describe('when sid not in store', () => {
   it('should create a new session', async () => {
@@ -43,7 +38,7 @@ describe('when sid not in store', () => {
     const res2 = await fetch(server, '/', { headers: { Cookie: cookie(res) } })
       .expect('Set-Cookie', /connect.sid/)
       .expect(200, 'session 2');
-    shouldSetCookieToDifferentSessionId(utils.sid(res))(res2);
+    shouldSetCookieToDifferentSessionId(sid(res))(res2);
   });
 });
 
@@ -59,7 +54,7 @@ describe('when sid not properly signed', () => {
     const res = await fetch(server, '/')
       .expect('Set-Cookie', /^sessid=/)
       .expect(200, 'session created');
-    const val = utils.sid(res);
+    const val = sid(res);
     assert.ok(val);
     const res2 = await fetch(server, '/', {
       headers: { Cookie: `sessid=${val}` }

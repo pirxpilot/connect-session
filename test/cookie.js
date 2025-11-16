@@ -1,6 +1,6 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const Cookie = require('../session/cookie');
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
+import Cookie from '../session/cookie.js';
 
 describe('new Cookie()', () => {
   it('should create a new cookie object', () => {

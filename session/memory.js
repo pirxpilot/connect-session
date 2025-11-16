@@ -6,134 +6,124 @@
  * MIT Licensed
  */
 
-const Store = require('./store');
-const util = require('node:util');
-
-module.exports = MemoryStore;
+import Store from './store.js';
 
 /**
  * A session store in memory.
  * @public
  */
 
-function MemoryStore() {
-  Store.call(this);
-  this.sessions = Object.create(null);
-}
+export default class MemoryStore extends Store {
+  sessions = Object.create(null);
 
-/**
- * Inherit from Store.
- */
+  /**
+   * Get all active sessions.
+   *
+   * @param {function} callback
+   * @public
+   */
 
-util.inherits(MemoryStore, Store);
+  all(callback) {
+    const sessionIds = Object.keys(this.sessions);
+    const sessions = Object.create(null);
 
-/**
- * Get all active sessions.
- *
- * @param {function} callback
- * @public
- */
+    for (let i = 0; i < sessionIds.length; i++) {
+      const sessionId = sessionIds[i];
+      const session = getSession.call(this, sessionId);
 
-MemoryStore.prototype.all = function all(callback) {
-  const sessionIds = Object.keys(this.sessions);
-  const sessions = Object.create(null);
-
-  for (let i = 0; i < sessionIds.length; i++) {
-    const sessionId = sessionIds[i];
-    const session = getSession.call(this, sessionId);
-
-    if (session) {
-      sessions[sessionId] = session;
+      if (session) {
+        sessions[sessionId] = session;
+      }
     }
+
+    return callback && setImmediate(callback, null, sessions);
   }
 
-  return callback && setImmediate(callback, null, sessions);
-};
+  /**
+   * Clear all sessions.
+   *
+   * @param {function} callback
+   * @public
+   */
 
-/**
- * Clear all sessions.
- *
- * @param {function} callback
- * @public
- */
-
-MemoryStore.prototype.clear = function clear(callback) {
-  this.sessions = Object.create(null);
-  return callback && setImmediate(callback);
-};
-
-/**
- * Destroy the session associated with the given session ID.
- *
- * @param {string} sessionId
- * @public
- */
-
-MemoryStore.prototype.destroy = function destroy(sessionId, callback) {
-  delete this.sessions[sessionId];
-  return callback && setImmediate(callback);
-};
-
-/**
- * Fetch session by the given session ID.
- *
- * @param {string} sessionId
- * @param {function} callback
- * @public
- */
-
-MemoryStore.prototype.get = function get(sessionId, callback) {
-  setImmediate(callback, null, getSession.call(this, sessionId));
-};
-
-/**
- * Commit the given session associated with the given sessionId to the store.
- *
- * @param {string} sessionId
- * @param {object} session
- * @param {function} callback
- * @public
- */
-
-MemoryStore.prototype.set = function set(sessionId, session, callback) {
-  this.sessions[sessionId] = JSON.stringify(session);
-  return callback && setImmediate(callback);
-};
-
-/**
- * Get number of active sessions.
- *
- * @param {function} callback
- * @public
- */
-
-MemoryStore.prototype.length = function length(callback) {
-  this.all((err, sessions) => {
-    if (err) return callback(err);
-    callback(null, Object.keys(sessions).length);
-  });
-};
-
-/**
- * Touch the given session object associated with the given session ID.
- *
- * @param {string} sessionId
- * @param {object} session
- * @param {function} callback
- * @public
- */
-
-MemoryStore.prototype.touch = function touch(sessionId, session, callback) {
-  const currentSession = getSession.call(this, sessionId);
-
-  if (currentSession) {
-    // update expiration
-    currentSession.cookie = session.cookie;
-    this.sessions[sessionId] = JSON.stringify(currentSession);
+  clear(callback) {
+    this.sessions = Object.create(null);
+    return callback && setImmediate(callback);
   }
 
-  return callback && setImmediate(callback);
-};
+  /**
+   * Destroy the session associated with the given session ID.
+   *
+   * @param {string} sessionId
+   * @public
+   */
+
+  destroy(sessionId, callback) {
+    delete this.sessions[sessionId];
+    return callback && setImmediate(callback);
+  }
+
+  /**
+   * Fetch session by the given session ID.
+   *
+   * @param {string} sessionId
+   * @param {function} callback
+   * @public
+   */
+
+  get(sessionId, callback) {
+    setImmediate(callback, null, getSession.call(this, sessionId));
+  }
+
+  /**
+   * Commit the given session associated with the given sessionId to the store.
+   *
+   * @param {string} sessionId
+   * @param {object} session
+   * @param {function} callback
+   * @public
+   */
+
+  set(sessionId, session, callback) {
+    this.sessions[sessionId] = JSON.stringify(session);
+    return callback && setImmediate(callback);
+  }
+
+  /**
+   * Get number of active sessions.
+   *
+   * @param {function} callback
+   * @public
+   */
+
+  length(callback) {
+    this.all((err, sessions) => {
+      if (err) return callback(err);
+      callback(null, Object.keys(sessions).length);
+    });
+  }
+
+  /**
+   * Touch the given session object associated with the given session ID.
+   *
+   * @param {string} sessionId
+   * @param {object} session
+   * @param {function} callback
+   * @public
+   */
+
+  touch(sessionId, session, callback) {
+    const currentSession = getSession.call(this, sessionId);
+
+    if (currentSession) {
+      // update expiration
+      currentSession.cookie = session.cookie;
+      this.sessions[sessionId] = JSON.stringify(currentSession);
+    }
+
+    return callback && setImmediate(callback);
+  }
+}
 
 /**
  * Get session from the store.

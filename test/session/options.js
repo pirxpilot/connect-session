@@ -1,20 +1,16 @@
-const { before, describe, it, after } = require('node:test');
-const assert = require('node:assert');
-const { fetch } = require('supertest-fetch');
-const utils = require('../support/utils');
-const { cookie, storeLen } = utils;
-
-const session = require('../../');
-
-const {
-  shouldSetSessionInStore,
+import assert from 'node:assert';
+import { after, before, describe, it } from 'node:test';
+import { fetch } from 'supertest-fetch';
+import session from '../../index.js';
+import { createServer, mountAt } from '../support/server.js';
+import {
   shouldNotSetSessionInStore,
   shouldSetCookieToValue,
   shouldSetCookieWithAttribute,
-  shouldSetCookieWithoutAttribute
-} = require('../support/should');
-
-const { createServer, mountAt } = require('../support/server');
+  shouldSetCookieWithoutAttribute,
+  shouldSetSessionInStore
+} from '../support/should.js';
+import { cookie, storeLen } from '../support/utils.js';
 
 const min = 60 * 1000;
 
@@ -24,7 +20,7 @@ describe('session options', () => {
       const ctx = {};
 
       before(() => {
-        ctx.server = createServer({ cookie: { path: '/foo/bar' } });
+        ctx.server = createServer({ cookie: { path: '/foo/bar' }, saveUninitialized: true });
       });
 
       after(() => {
@@ -56,7 +52,8 @@ describe('session options', () => {
       describe('when mounted at "/foo"', () => {
         before(() => {
           ctx.server = createServer(mountAt('/foo'), {
-            cookie: { path: '/foo/bar' }
+            cookie: { path: '/foo/bar' },
+            saveUninitialized: true
           });
         });
 
@@ -88,7 +85,7 @@ describe('session options', () => {
           res.end(String(req.secure));
         }
 
-        ctx.server = createServer(setup, { cookie: { secure: 'auto' } }, respond);
+        ctx.server = createServer(setup, { cookie: { secure: 'auto' }, saveUninitialized: true }, respond);
       });
 
       it('should set secure if req.secure = true', async () => {
@@ -115,7 +112,7 @@ describe('session options', () => {
     });
 
     it('should provide default generator', async () => {
-      await fetch(createServer(), '/')
+      await fetch(createServer({ saveUninitialized: true }), '/')
         .expectHeader('Set-Cookie', /connect.sid/)
         .expectStatus(200);
     });
@@ -130,7 +127,7 @@ describe('session options', () => {
         's%3Aapple.D8Y%2BpkTAmeR0PobOhY4G97PRW%2Bj7bUnP%2F5m6%2FOn1MCU'
       );
 
-      const res = await fetch(createServer({ genid }), '/').expectStatus(200);
+      const res = await fetch(createServer({ genid, saveUninitialized: true }), '/').expectStatus(200);
       check(res);
     });
 
@@ -141,7 +138,7 @@ describe('session options', () => {
 
       const check = shouldSetCookieToValue('connect.sid', 's%3A%25.kzQ6x52kKVdF35Qh62AWk4ZekS28K5XYCXKa%2FOTZ01g');
 
-      const res = await fetch(createServer({ genid }), '/').expectStatus(200);
+      const res = await fetch(createServer({ genid, saveUninitialized: true }), '/').expectStatus(200);
       check(res);
     });
 
@@ -152,20 +149,20 @@ describe('session options', () => {
 
       const check = shouldSetCookieToValue('connect.sid', 's%3A%2Ffoo.paEKBtAHbV5s1IB8B2zPnzAgYmmnRPIqObW4VRYj%2FMQ');
 
-      const res = await fetch(createServer({ genid }), '/foo').expectStatus(200);
+      const res = await fetch(createServer({ genid, saveUninitialized: true }), '/foo').expectStatus(200);
       check(res);
     });
   });
 
   describe('key option', () => {
     it('should default to "connect.sid"', async () => {
-      await fetch(createServer(), '/')
+      await fetch(createServer({ saveUninitialized: true }), '/')
         .expectHeader('Set-Cookie', /connect.sid/)
         .expectStatus(200);
     });
 
     it('should allow overriding', async () => {
-      await fetch(createServer({ key: 'session_id' }), '/')
+      await fetch(createServer({ key: 'session_id', saveUninitialized: true }), '/')
         .expectHeader('Set-Cookie', /session_id/)
         .expectStatus(200);
     });
@@ -173,13 +170,13 @@ describe('session options', () => {
 
   describe('name option', () => {
     it('should default to "connect.sid"', async () => {
-      await fetch(createServer(), '/')
+      await fetch(createServer({ saveUninitialized: true }), '/')
         .expectHeader('Set-Cookie', /connect.sid/)
         .expectStatus(200);
     });
 
     it('should set the cookie name', async () => {
-      await fetch(createServer({ name: 'session_id' }), '/')
+      await fetch(createServer({ name: 'session_id', saveUninitialized: true }), '/')
         .expectHeader('Set-Cookie', /session_id/)
         .expectStatus(200);
     });
@@ -258,7 +255,7 @@ describe('session options', () => {
   });
 
   describe('resave option', () => {
-    it('should default to true', async () => {
+    it('should default to false', async () => {
       const store = new session.MemoryStore();
       const server = createServer({ store }, (req, res) => {
         req.session.user = 'bob';
@@ -268,7 +265,7 @@ describe('session options', () => {
       let check = shouldSetSessionInStore(store);
       const res = await fetch(server, '/').expectStatus(200);
       check();
-      check = shouldSetSessionInStore(store);
+      check = shouldNotSetSessionInStore(store);
       await fetch(server, '/', {
         headers: { Cookie: cookie(res) }
       }).expectStatus(200);
@@ -392,14 +389,12 @@ describe('session options', () => {
   });
 
   describe('saveUninitialized option', () => {
-    it('should default to true', async () => {
+    it('should default to false', async () => {
       const store = new session.MemoryStore();
       const server = createServer({ store });
 
-      const check = shouldSetSessionInStore(store);
-      await fetch(server, '/')
-        .expectHeader('Set-Cookie', /connect.sid/)
-        .expectStatus(200);
+      const check = shouldNotSetSessionInStore(store);
+      await fetch(server, '/').expectHeader('Set-Cookie', null).expectStatus(200);
       check();
     });
 

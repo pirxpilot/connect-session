@@ -5,8 +5,6 @@
  * MIT Licensed
  */
 
-module.exports = Session;
-
 /**
  * Create a new `Session` with the given request and `data`.
  *
@@ -14,7 +12,7 @@ module.exports = Session;
  * @param {Object} data
  */
 
-function Session(req, data) {
+export default function Session(req, data) {
   Object.defineProperty(this, 'req', { value: req });
   Object.defineProperty(this, 'id', { value: req.sessionID });
 

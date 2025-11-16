@@ -1,16 +1,13 @@
-const { ServerResponse } = require('node:http');
-
-const { serialize } = require('cookie');
-const { sign } = require('cookie-signature');
-
-module.exports = decorate;
+import { ServerResponse } from 'node:http';
+import { serialize } from 'cookie';
+import { sign } from 'cookie-signature';
 
 const proto = Object.create(ServerResponse.prototype);
 Object.assign(proto, {
   cookie
 });
 
-function decorate(res) {
+export default function decorate(res) {
   Object.setPrototypeOf(res, proto);
 }
 

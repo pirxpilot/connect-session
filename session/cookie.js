@@ -5,8 +5,6 @@
  * MIT Licensed
  */
 
-const deprecate = require('depd')('connect-session');
-
 /**
  * Initialize a new `Cookie` with the given `options`.
  *
@@ -14,33 +12,33 @@ const deprecate = require('depd')('connect-session');
  * @param {Object} options
  */
 
-const Cookie = (module.exports = function Cookie(options) {
-  this.path = '/';
-  this.maxAge = null;
-  this.httpOnly = true;
+export default class Cookie {
+  constructor(options) {
+    this.path = '/';
+    this.maxAge = null;
+    this.httpOnly = true;
 
-  if (options) {
-    if (typeof options !== 'object') {
-      throw new TypeError('argument options must be a object');
-    }
+    if (options) {
+      if (typeof options !== 'object') {
+        throw new TypeError('argument options must be a object');
+      }
 
-    for (const key in options) {
-      if (key !== 'data') {
-        this[key] = options[key];
+      for (const key in options) {
+        if (key !== 'data') {
+          this[key] = options[key];
+        }
       }
     }
+
+    if (this.originalMaxAge === undefined || this.originalMaxAge === null) {
+      this.originalMaxAge = this.maxAge;
+    }
   }
 
-  if (this.originalMaxAge === undefined || this.originalMaxAge === null) {
-    this.originalMaxAge = this.maxAge;
-  }
-});
+  /*!
+   * Prototype.
+   */
 
-/*!
- * Prototype.
- */
-
-Cookie.prototype = {
   /**
    * Set expires `date`.
    *
@@ -50,7 +48,7 @@ Cookie.prototype = {
   set expires(date) {
     this._expires = date;
     this.originalMaxAge = this.maxAge;
-  },
+  }
 
   /**
    * Get expires `date`.
@@ -60,7 +58,7 @@ Cookie.prototype = {
 
   get expires() {
     return this._expires;
-  },
+  }
 
   /**
    * Set expires via max-age in `ms`.
@@ -73,12 +71,8 @@ Cookie.prototype = {
       throw new TypeError('maxAge must be a number or Date');
     }
 
-    if (ms instanceof Date) {
-      deprecate('maxAge as Date; pass number of milliseconds instead');
-    }
-
     this.expires = typeof ms === 'number' ? new Date(Date.now() + ms) : ms;
-  },
+  }
 
   /**
    * Get expires max-age in `ms`.
@@ -88,7 +82,7 @@ Cookie.prototype = {
 
   get maxAge() {
     return this.expires instanceof Date ? this.expires.valueOf() - Date.now() : this.expires;
-  },
+  }
 
   /**
    * Return cookie data object.
@@ -108,7 +102,7 @@ Cookie.prototype = {
       path: this.path,
       sameSite: this.sameSite
     };
-  },
+  }
 
   /**
    * Return JSON representation of this cookie.
@@ -119,4 +113,4 @@ Cookie.prototype = {
   toJSON() {
     return this.data;
   }
-};
+}

@@ -6,32 +6,29 @@
  * MIT Licensed
  */
 
-const Buffer = require('node:buffer').Buffer;
-const crypto = require('node:crypto');
-const debug = require('debug')('connect-session');
-const deprecate = require('depd')('connect-session');
-const onHeaders = require('on-headers');
-const parseUrl = require('parseurl');
-const uid = require('ufid').generator({ size: 24 });
+import { Buffer } from 'node:buffer';
+import crypto from 'node:crypto';
+import Debug from 'debug';
+import onHeaders from 'on-headers';
+import parseUrl from 'parseurl';
+import { generator } from 'ufid';
+import Cookie from './session/cookie.js';
+import MemoryStore from './session/memory.js';
+import Session from './session/session.js';
+import Store from './session/store.js';
 
-const Cookie = require('./session/cookie');
-const MemoryStore = require('./session/memory');
-const Session = require('./session/session');
-const Store = require('./session/store');
+const uid = generator({ size: 24 });
+const debug = Debug('connect-session');
 
 // environment
 
 const env = process.env.NODE_ENV;
 
 /**
- * Expose the middleware.
- */
-
-module.exports = session;
-
-/**
  * Expose constructors.
  */
+
+export { Store, Cookie, Session, MemoryStore };
 
 session.Store = Store;
 session.Cookie = Cookie;
@@ -64,8 +61,8 @@ const warning =
  * @public
  */
 
-function session(options) {
-  const opts = options || {};
+export default function session(options = {}) {
+  const opts = options;
 
   // get the cookie options
   const cookieOptions = opts.cookie || {};
@@ -80,26 +77,16 @@ function session(options) {
   const store = opts.store || new MemoryStore();
 
   // get the resave session option
-  let resaveSession = opts.resave;
+  const resaveSession = opts.resave;
 
   // get the rolling session option
   const rollingSessions = Boolean(opts.rolling);
 
   // get the save uninitialized session option
-  let saveUninitializedSession = opts.saveUninitialized;
+  const saveUninitializedSession = opts.saveUninitialized;
 
   if (typeof generateId !== 'function') {
     throw new TypeError('genid option must be a function');
-  }
-
-  if (resaveSession === undefined) {
-    deprecate('undefined resave option; provide resave option');
-    resaveSession = true;
-  }
-
-  if (saveUninitializedSession === undefined) {
-    deprecate('undefined saveUninitialized option; provide saveUninitialized option');
-    saveUninitializedSession = true;
   }
 
   if (opts.unset && opts.unset !== 'destroy' && opts.unset !== 'keep') {
