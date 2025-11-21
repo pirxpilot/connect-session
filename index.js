@@ -210,52 +210,44 @@ export default function session(options = {}) {
 
       ended = true;
 
-      let ret;
       let sync = true;
 
       function writeend() {
         if (sync) {
-          ret = _end.call(res, chunk, encoding);
-          sync = false;
-          return;
+          return _end.call(res, chunk, encoding);
         }
 
         _end.call(res);
       }
 
       function writetop() {
-        if (!sync) {
-          return ret;
-        }
-
         if (!res._header) {
           res._implicitHeader();
         }
 
         if (chunk == null) {
-          ret = true;
-          return ret;
+          return;
         }
 
         const contentLength = Number(res.getHeader('Content-Length'));
 
-        if (!Number.isNaN(contentLength) && contentLength > 0) {
+        if (contentLength > 0) {
           // measure chunk
           chunk = !Buffer.isBuffer(chunk) ? Buffer.from(chunk, encoding) : chunk;
           encoding = undefined;
 
           if (chunk.length !== 0) {
             debug('split response');
-            ret = _write.call(res, chunk.slice(0, chunk.length - 1));
+            _write.call(res, chunk.slice(0, chunk.length - 1));
             chunk = chunk.slice(chunk.length - 1, chunk.length);
-            return ret;
+            return;
           }
         }
 
-        ret = _write.call(res, chunk, encoding);
+        _write.call(res, chunk, encoding);
         sync = false;
 
-        return ret;
+        return;
       }
 
       if (shouldDestroy(req)) {
